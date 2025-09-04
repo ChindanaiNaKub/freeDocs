@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Format Comparison</title>
+    <link rel="stylesheet" href="public/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Google Docs Format Comparison</h1>
+        
+        <h2>Original Google Docs Format (What you see in the document):</h2>
+        <div style="background: #f5f5f5; padding: 1rem; margin: 1rem 0; font-family: Arial;">
+            <h3>Introduction to Spring Boot</h3>
+            <p>1. Spring web server which will provide the REST api</p>
+            <p>1.1. Open your Intellij Idea (if you use other IDE, go to 1.8)</p>
+            <p>1.2. Note: If you have registered for the GitHub Student Pack...</p>
+            <p>1.3. Create your new spring project by selecting a new project...</p>
+            <p>Note that you may have to install Java version 17...</p>
+        </div>
+        
+        <h2>FreeDocs Parsed Format (What your app produces):</h2>
+        <div class="freedocs-content" style="border: 1px solid #ddd; padding: 1rem; margin: 1rem 0;">
+            <h2 class="freedocs-heading">Introduction to Spring Boot</h2>
+            <ol class="freedocs-list">
+                <li value="1">Spring web server which will provide the REST api</li>
+                <li data-custom-number="1.1">
+                    <span class="custom-number">1.1</span>
+                    Open your Intellij Idea (if you use other IDE, go to 1.8)
+                </li>
+                <li data-custom-number="1.2">
+                    <span class="custom-number">1.2</span>
+                    Note: If you have registered for the GitHub Student Pack, then you can register for the student license at https://www.jetbrains.com/community/education/ to use the Ultimate version of the software.
+                </li>
+                <li data-custom-number="1.3">
+                    <span class="custom-number">1.3</span>
+                    Create your new spring project by selecting a new project and selecting the data as shown in the picture
+                </li>
+            </ol>
+            <p class="freedocs-paragraph">Note that you may have to install Java version 17 to get all the features of the source code.</p>
+        </div>
+    </div>
+</body>
+</html>

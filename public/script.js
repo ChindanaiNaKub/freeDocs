@@ -134,9 +134,12 @@ class FreeDocs {
 
   renderContent(blocks) {
     const contentDiv = document.getElementById('documentContent');
+    // Normalize blocks to support Google Docs-style split ordered lists
+    const normalizedBlocks = this.normalizeHierarchicalLists(blocks);
+
     let html = '<div class="freedocs-content">\n';
 
-    blocks.forEach((block, index) => {
+    normalizedBlocks.forEach((block, index) => {
       html += this.renderBlock(block, index);
     });
 
@@ -146,6 +149,64 @@ class FreeDocs {
     // Bind copy button events
     this.bindCopyButtons();
     this.bindDeletionToggles();
+  }
+
+  // Detect pattern: an ordered list with a single item (e.g., "1. ...")
+  // followed by another ordered list representing its subitems. Assign
+  // custom numbers like "1.1", "1.2" to the following list items.
+  normalizeHierarchicalLists(blocks) {
+    const result = [];
+    let pendingParentNumber = null;
+
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+
+      if (block.type === 'ordered-list') {
+        const items = block.items || [];
+
+        // If we already have a parent number, apply hierarchical numbering
+        if (pendingParentNumber !== null && items.length > 0) {
+          const newItems = items.map((item, idx) => {
+            // Preserve existing custom numbers if already present
+            if (item.customNumber !== null && item.customNumber !== undefined) {
+              return item;
+            }
+            const customNumber = `${pendingParentNumber}.${idx + 1}`;
+            return { ...item, customNumber };
+          });
+          result.push({ ...block, items: newItems });
+          // Keep pendingParentNumber active in case multiple consecutive ol blocks appear
+          continue;
+        }
+
+        // No parent yet: if this ordered list looks like a single top-level item,
+        // capture its number (default to 1 when not specified)
+        if (items.length === 1) {
+          const first = items[0];
+          // Determine its visible number
+          let numberStr = '1';
+          if (first.customNumber !== null && first.customNumber !== undefined) {
+            numberStr = String(first.customNumber).split('.')[0];
+          } else if (block.startValue && block.startValue > 1) {
+            numberStr = String(block.startValue);
+          }
+          pendingParentNumber = numberStr;
+          result.push(block);
+          continue;
+        }
+
+        // Regular ordered list without hierarchy context
+        pendingParentNumber = null;
+        result.push(block);
+        continue;
+      }
+
+      // Any non-ordered-list block resets the hierarchy context
+      pendingParentNumber = null;
+      result.push(block);
+    }
+
+    return result;
   }
 
   renderBlock(block, index) {
@@ -212,16 +273,23 @@ class FreeDocs {
 
   renderList(block) {
     const tag = block.type === 'ordered-list' ? 'ol' : 'ul';
-    let html = `<${tag} class="freedocs-list">\n`;
-    
+    const startAttr = block.startValue && block.startValue !== 1 ? ` start="${block.startValue}"` : '';
+    let html = `<${tag} class="freedocs-list"${startAttr}>\n`;
+
     block.items.forEach(item => {
       if (item.type === 'code') {
         html += `<li>${this.renderCodeBlock(item, Math.random().toString(36).substr(2, 9))}</li>\n`;
       } else {
-        html += `<li>${this.escapeHtml(item.text)}</li>\n`;
+        const hasCustom = item.customNumber !== null && item.customNumber !== undefined;
+        if (hasCustom) {
+          const custom = this.escapeHtml(String(item.customNumber));
+          html += `<li data-custom-number="${custom}"><span class="custom-number">${custom}</span>${this.escapeHtml(item.text)}</li>\n`;
+        } else {
+          html += `<li>${this.escapeHtml(item.text)}</li>\n`;
+        }
       }
     });
-    
+
     html += `</${tag}>\n`;
     return html;
   }

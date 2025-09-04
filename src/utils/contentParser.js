@@ -397,16 +397,11 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
         // Same main number as previous - make it a sub-item
         subItemCounter++;
         displayNumber = `${lastMainNumber}.${subItemCounter}`;
-      } else if (numValue === lastMainNumber + 1) {
-        // Next sequential number - new main item
-        lastMainNumber = numValue;
-        subItemCounter = 0;
-        displayNumber = number;
       } else {
-        // Non-sequential jump - treat as new main item
-        lastMainNumber = numValue;
-        subItemCounter = 0;
-        displayNumber = number;
+        // For any subsequent number after we've started a list, 
+        // treat it as a sub-item unless it's clearly a new major section
+        subItemCounter++;
+        displayNumber = `${lastMainNumber}.${subItemCounter}`;
       }
     }
     
@@ -959,10 +954,10 @@ function generateSanitizedHtml(blocks) {
           if (item.type === 'code') {
             html += `<li${valueAttr}>${generateCodeBlockHtml(item)}</li>\n`;
           } else {
-            // For custom decimal numbering like 1.1, 1.2, use CSS to display it
-            if (item.customNumber && typeof item.customNumber === 'string' && item.customNumber.includes('.')) {
-              html += `<li${valueAttr} data-custom-number="${item.customNumber}" style="list-style: none; position: relative;">`;
-              html += `<span class="custom-number" style="position: absolute; left: -2em; font-weight: bold;">${item.customNumber}.</span>`;
+            // For ALL custom numbering, use CSS to display it consistently
+            if (item.customNumber) {
+              html += `<li data-custom-number="${item.customNumber}">`;
+              html += `<span class="custom-number">${item.customNumber}</span>`;
               html += `${escapeHtml(item.text)}</li>\n`;
             } else {
               html += `<li${valueAttr}>${escapeHtml(item.text)}</li>\n`;
