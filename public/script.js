@@ -7,6 +7,7 @@ class FreeDocs {
   constructor() {
     this.currentBlocks = [];
     this.currentArchiveUrl = '';
+    this.imageDelegationAttached = false;
     this.init();
   }
 
@@ -92,7 +93,8 @@ class FreeDocs {
       const params = new URLSearchParams({
         url: url,
         autoDetectCode: autoDetectCode.toString(),
-        showDeletions: showDeletions.toString()
+        showDeletions: showDeletions.toString(),
+        extractImages: 'true' // Always extract images by default
       });
       
       // First try to parse the content
@@ -106,6 +108,10 @@ class FreeDocs {
       const data = await response.json();
       this.currentBlocks = data.blocks;
       this.currentArchiveUrl = data.archiveUrl;
+
+      // Log image blocks for debugging
+      const imageBlocks = data.blocks.filter(block => block.type === 'image');
+      console.log('Found', imageBlocks.length, 'image blocks in the document');
 
       // Render the content
       this.renderContent(data.blocks);
@@ -149,6 +155,7 @@ class FreeDocs {
     // Bind copy button events
     this.bindCopyButtons();
     this.bindDeletionToggles();
+    this.ensureImageHandlers();
   }
 
   // Detect pattern: an ordered list with a single item (e.g., "1. ...")
@@ -214,6 +221,9 @@ class FreeDocs {
       case 'heading':
         return `<h${block.level} class="freedocs-heading">${this.escapeHtml(block.text)}</h${block.level}>\n`;
       
+      case 'image':
+        return this.renderImageBlock(block, index);
+      
       case 'paragraph':
         return `<p class="freedocs-paragraph">${this.escapeHtml(block.text)}</p>\n`;
       
@@ -231,6 +241,118 @@ class FreeDocs {
       default:
         return '';
     }
+  }
+
+  renderImageBlock(block, index) {
+    const { src, alt, title, width, height, format, isArchiveImage, originalSrc } = block;
+    
+    // Log image rendering for debugging
+    console.log('Rendering image:', alt || 'unnamed', 'from:', src);
+    
+    // Build attributes
+    let attributes = `src="${this.escapeHtml(src)}"`;
+    
+    if (alt) {
+      attributes += ` alt="${this.escapeHtml(alt)}"`;
+    }
+    
+    if (title) {
+      attributes += ` title="${this.escapeHtml(title)}"`;
+    }
+    
+    if (width) {
+      attributes += ` width="${width}"`;
+    }
+    
+    if (height) {
+      attributes += ` height="${height}"`;
+    }
+    
+    // Add data attributes for metadata
+    attributes += ` data-format="${format}"`;
+    attributes += ` data-is-archive-image="${isArchiveImage}"`;
+    attributes += ` data-original-src="${this.escapeHtml(originalSrc)}"`;
+    attributes += ` data-extracted-at="${block.metadata.extractedAt}"`;
+    
+    // Add CSS classes
+    const classes = ['freedocs-image'];
+    if (isArchiveImage) {
+      classes.push('archive-image');
+    }
+    if (format !== 'unknown') {
+      classes.push(`format-${format}`);
+    }
+    
+    attributes += ` class="${classes.join(' ')}"`;
+    
+    // Generate the image HTML
+    let html = `<div class="freedocs-image-container">\n`;
+    html += `  <img ${attributes}/>\n`;
+    
+    // Add metadata display if it's an archive image
+    if (isArchiveImage) {
+      html += `  <div class="freedocs-image-metadata">\n`;
+      html += `    <span class="image-format">Format: ${format.toUpperCase()}</span>\n`;
+      html += `    <span class="image-source">Source: Internet Archive</span>\n`;
+      if (originalSrc !== src) {
+        html += `    <span class="original-url">Original: ${this.escapeHtml(originalSrc)}</span>\n`;
+      }
+      html += `  </div>\n`;
+    }
+    
+    html += `</div>\n`;
+    
+    return html;
+  }
+
+  ensureImageHandlers() {
+    const contentDiv = document.getElementById('documentContent');
+    if (!contentDiv) return;
+
+    if (!this.imageDelegationAttached) {
+      // Use capture phase because load/error do not bubble
+      contentDiv.addEventListener(
+        'load',
+        (e) => {
+          const target = e.target;
+          if (target && (target.matches ? target.matches('img.freedocs-image') : target.classList.contains('freedocs-image'))) {
+            console.log('✅ Image loaded successfully:', target.src);
+          }
+        },
+        true
+      );
+
+      contentDiv.addEventListener(
+        'error',
+        (e) => {
+          const target = e.target;
+          if (target && (target.matches ? target.matches('img.freedocs-image') : target.classList.contains('freedocs-image'))) {
+            const img = target;
+            console.error('❌ Image failed to load:', img.src);
+            img.style.border = '2px solid red';
+            img.alt = 'Failed to load image';
+            img.style.backgroundColor = '#ffebee';
+          }
+        },
+        true
+      );
+
+      this.imageDelegationAttached = true;
+    }
+
+    // Handle images that may have already resolved before listeners attached
+    contentDiv.querySelectorAll('img.freedocs-image').forEach((img) => {
+      if (img.complete) {
+        if (img.naturalWidth > 0) {
+          console.log('✅ Image loaded successfully:', img.src);
+        } else {
+          console.error('❌ Image failed to load:', img.src);
+          img.style.border = '2px solid red';
+          img.alt = 'Failed to load image';
+          img.style.backgroundColor = '#ffebee';
+        }
+      }
+    });
   }
 
   renderCodeBlock(block, index) {

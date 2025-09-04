@@ -4,7 +4,7 @@
 
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { getArchivedContent, getCachedContent } = require('./archiveClient');
+const { getArchivedContent, getCachedContent, normalizeImageUrl, isArchiveImageUrl, detectImageFormat } = require('./archiveClient');
 
 /**
  * Fetches and parses archived content
@@ -18,7 +18,8 @@ async function parseArchivedContent(archiveUrl, options = {}) {
   // Set default options
   const parseOptions = {
     autoDetectCode: options.autoDetectCode !== undefined ? options.autoDetectCode : true,
-    showDeletions: options.showDeletions !== undefined ? options.showDeletions : true
+    showDeletions: options.showDeletions !== undefined ? options.showDeletions : true,
+    extractImages: options.extractImages !== undefined ? options.extractImages : true
   };
 
   try {
@@ -88,7 +89,7 @@ async function parseArchivedContent(archiveUrl, options = {}) {
     }
     
     // Parse the content into blocks
-    const blocks = parseContentBlocks($, parseOptions);
+    const blocks = parseContentBlocks($, { ...parseOptions, archiveUrl });
     
     // Generate sanitized HTML for rendering
     const html = generateSanitizedHtml(blocks);
@@ -190,6 +191,7 @@ function extractSafeContent(content) {
  * @param {Object} options - Parsing options
  * @param {boolean} options.autoDetectCode - Whether to auto-detect code blocks
  * @param {boolean} options.showDeletions - Whether to include deleted lines
+ * @param {boolean} options.extractImages - Whether to extract and preserve images
  * @returns {Array} - Array of content blocks
  */
 function parseContentBlocks($, options = {}) {
@@ -215,6 +217,12 @@ function parseContentBlocks($, options = {}) {
     $content = $('body');
   }
 
+  // Extract images first if enabled
+  if (options.extractImages !== false) {
+    const imageBlocks = extractImages($, $content, { ...options, archiveUrl: options.archiveUrl });
+    blocks.push(...imageBlocks);
+  }
+
   // Get all elements in document order
   const allElements = $content.find('*').toArray();
   let i = 0;
@@ -223,7 +231,7 @@ function parseContentBlocks($, options = {}) {
     const element = allElements[i];
     const $el = $(element);
     
-    if ($el.hasClass('processed')) {
+    if ($el.hasClass('processed') || $el.hasClass('processed-image')) {
         i++;
         continue;
     }
@@ -233,6 +241,11 @@ function parseContentBlocks($, options = {}) {
     let block = null;
     
     switch (tagName) {
+      case 'img':
+        // Images are already processed by extractImages function
+        $el.addClass('processed-image');
+        i++;
+        break;
       case 'h1':
       case 'h2':
       case 'h3':
@@ -268,10 +281,28 @@ function parseContentBlocks($, options = {}) {
               }
               i += codeGroupResult.elementsProcessed;
             } else {
-              if (tagName === 'p') {
-                block = parseParagraph($, $el);
-                if (block) {
-                  blocks.push(block);
+              // Check if this is a single code-like paragraph that should be combined with previous code block
+              if (tagName === 'p' && isCodeLikeParagraph($el, $el.text())) {
+                const prevBlock = blocks[blocks.length - 1];
+                if (prevBlock && prevBlock.type === 'code') {
+                  // Combine with previous code block
+                  const newContent = prevBlock.lines.map(line => line.text).join('\n') + '\n' + $el.text();
+                  const combinedBlock = parseCodeContent(newContent, 'paragraph-group', options);
+                  blocks[blocks.length - 1] = combinedBlock;
+                } else {
+                  // Create new code block
+                  block = parseCodeContent($el.text(), 'paragraph', options);
+                  if (block) {
+                    blocks.push(block);
+                  }
+                }
+              } else {
+                // Regular paragraph
+                if (tagName === 'p') {
+                  block = parseParagraph($, $el);
+                  if (block) {
+                    blocks.push(block);
+                  }
                 }
               }
               $el.addClass('processed');
@@ -330,6 +361,65 @@ function parseContentBlocks($, options = {}) {
 }
 
 /**
+ * Extracts images from content and preserves their original formats
+ * @param {CheerioAPI} $ - Cheerio instance
+ * @param {Cheerio} $content - Content container
+ * @param {Object} options - Parsing options
+ * @param {string} options.archiveUrl - The archive URL for URL normalization
+ * @returns {Array} - Array of image blocks
+ */
+function extractImages($, $content, options = {}) {
+  const imageBlocks = [];
+  
+  // Find all image elements
+  $content.find('img').each((index, img) => {
+    const $img = $(img);
+    const src = $img.attr('src');
+    const alt = $img.attr('alt') || '';
+    const title = $img.attr('title') || '';
+    const width = $img.attr('width');
+    const height = $img.attr('height');
+    
+    if (!src) {
+      return; // Skip images without src
+    }
+    
+    // Normalize the image URL using the archive client utilities
+    const imageUrl = normalizeImageUrl(src, options.archiveUrl);
+    
+    // Check if this is an Internet Archive image URL
+    const isArchiveImage = isArchiveImageUrl(imageUrl);
+    
+    // Extract image format using the archive client utility
+    const format = detectImageFormat(imageUrl);
+    
+    const imageBlock = {
+      type: 'image',
+      src: imageUrl,
+      alt: alt,
+      title: title,
+      width: width ? parseInt(width, 10) : null,
+      height: height ? parseInt(height, 10) : null,
+      format: format,
+      isArchiveImage: isArchiveImage,
+      originalSrc: src,
+      metadata: {
+        extractedAt: new Date().toISOString(),
+        preservedFormat: true
+      }
+    };
+    
+    imageBlocks.push(imageBlock);
+    
+    // Mark the image element as processed to avoid duplicate processing
+    $img.addClass('processed-image');
+  });
+  
+  console.log(`Extracted ${imageBlocks.length} images`);
+  return imageBlocks;
+}
+
+/**
  * Parses a potential numbered list group starting from the given index
  * @param {CheerioAPI} $ - Cheerio instance
  * @param {Array} allElements - Array of all elements
@@ -345,7 +435,8 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
   const $firstEl = $(firstElement);
   const firstText = $firstEl.text().trim();
   
-  // Check if this looks like a numbered list item
+  // Enhanced pattern matching for numbered lists
+  // Matches: "1.", "1.1", "1.2.3", "2.1", etc.
   const numberMatch = firstText.match(/^(\d+(?:\.\d+)*)\.\s*(.*)$/);
   if (!numberMatch) {
     return { isNumberedList: false, elementsProcessed: 0 };
@@ -356,6 +447,7 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
   let currentIndex = startIndex;
   let lastMainNumber = null;
   let subItemCounter = 0;
+  let hasSeenSubItems = false;
   
   while (currentIndex < allElements.length) {
     const element = allElements[currentIndex];
@@ -375,7 +467,6 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
     
     if (!match) {
       // If this paragraph doesn't start with a number, stop here
-      // Don't try to merge non-numbered content into list items
       break;
     }
     
@@ -384,8 +475,13 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
     // Determine the appropriate numbering
     let displayNumber = number;
     
-    // If this is a simple integer number, check if we need to convert to hierarchical
-    if (/^\d+$/.test(number)) {
+    // Check if this is a hierarchical number (e.g., "1.1", "2.3")
+    if (number.includes('.')) {
+      // Already hierarchical, use as-is
+      displayNumber = number;
+      hasSeenSubItems = true;
+    } else {
+      // Simple integer number
       const numValue = parseInt(number, 10);
       
       if (lastMainNumber === null) {
@@ -397,11 +493,22 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
         // Same main number as previous - make it a sub-item
         subItemCounter++;
         displayNumber = `${lastMainNumber}.${subItemCounter}`;
-      } else {
+        hasSeenSubItems = true;
+      } else if (hasSeenSubItems && numValue > lastMainNumber) {
+        // We've seen sub-items and this is a new main number
+        // Always treat as sub-item when we're in a hierarchical context
+        subItemCounter++;
+        displayNumber = `${lastMainNumber}.${subItemCounter}`;
+        hasSeenSubItems = true;
+      } else if (lastMainNumber !== null) {
         // For any subsequent number after we've started a list, 
         // treat it as a sub-item unless it's clearly a new major section
         subItemCounter++;
         displayNumber = `${lastMainNumber}.${subItemCounter}`;
+        hasSeenSubItems = true;
+      } else {
+        // This shouldn't happen, but just in case
+        displayNumber = number;
       }
     }
     
@@ -688,11 +795,19 @@ function canBeInCodeBlock($el, text) {
         return true;
     }
     
+    // Don't include numbered instructions in code blocks
     if (/^\d+\.\d*\.?\s/.test(trimmedText) && !/[<>{}=;]/.test(trimmedText)) {
         return false;
     }
-    const instructionalPattern = /^(Now we will create|Next, add|Then, update)\b/i;
+    
+    // Don't include instructional text in code blocks
+    const instructionalPattern = /^(Now we will create|Next, add|Then, update|After you add|click to update|you will see|Add the|Create the|Update the)\b/i;
     if(instructionalPattern.test(trimmedText)){
+        return false;
+    }
+    
+    // Don't include text that looks like instructions rather than code
+    if (/^(Add|Create|Update|Now|Next|Wait|Open|If|See|Note|The component|Creating the entity|In this lab|As given|With the given information)\b/i.test(trimmedText) && !/[<>{}=;]/.test(trimmedText)) {
         return false;
     }
 
@@ -772,8 +887,7 @@ function groupXmlLines(lines, language) {
   let currentGroup = [];
   let groupOp = 'unchanged';
   let insideDependency = false;
-  let insideGroupId = false;
-  let insideArtifactId = false;
+  let dependencyDepth = 0;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -787,6 +901,7 @@ function groupXmlLines(lines, language) {
         currentGroup = [];
       }
       insideDependency = true;
+      dependencyDepth = 1;
       currentGroup.push(line);
       groupOp = line.op;
     }
@@ -794,57 +909,58 @@ function groupXmlLines(lines, language) {
     else if (cleanText.includes('</dependency>')) {
       currentGroup.push(line);
       insideDependency = false;
+      dependencyDepth = 0;
       groupedLines.push(createGroupedLine(currentGroup, groupOp));
       currentGroup = [];
       groupOp = 'unchanged';
     }
-    // Detect start of groupId, artifactId tags
-    else if (cleanText.includes('<groupId>') || cleanText.includes('<artifactId>')) {
-      // If we have a current group, finish it first
-      if (currentGroup.length > 0 && !insideDependency) {
-        groupedLines.push(createGroupedLine(currentGroup, groupOp));
-        currentGroup = [];
-      }
-      
-      if (cleanText.includes('<groupId>')) {
-        insideGroupId = true;
-      } else if (cleanText.includes('<artifactId>')) {
-        insideArtifactId = true;
-      }
-      
-      currentGroup.push(line);
-      groupOp = line.op;
-    }
-    // Detect end of groupId, artifactId tags
-    else if (cleanText.includes('</groupId>') || cleanText.includes('</artifactId>')) {
-      currentGroup.push(line);
-      
-      if (!insideDependency) {
-        groupedLines.push(createGroupedLine(currentGroup, groupOp));
-        currentGroup = [];
-        groupOp = 'unchanged';
-      }
-      
-      insideGroupId = false;
-      insideArtifactId = false;
-    }
-    // If we're inside a dependency or groupId/artifactId, keep adding to current group
-    else if (insideDependency || insideGroupId || insideArtifactId) {
+    // If we're inside a dependency, keep adding ALL lines to current group
+    else if (insideDependency) {
       currentGroup.push(line);
       // Update group operation if it's more significant (added/removed vs unchanged)
       if (line.op !== 'unchanged' && groupOp === 'unchanged') {
         groupOp = line.op;
       }
     }
-    // For standalone lines, add them individually
+    // For lines outside dependencies, check if they should be grouped together
     else {
-      // Finish any current group first
-      if (currentGroup.length > 0) {
-        groupedLines.push(createGroupedLine(currentGroup, groupOp));
-        currentGroup = [];
-        groupOp = 'unchanged';
+      // Check if this line starts a new logical group (like a complete XML block)
+      const isStartOfNewGroup = cleanText.includes('<') && (
+        cleanText.includes('<groupId>') || 
+        cleanText.includes('<artifactId>') || 
+        cleanText.includes('<version>') || 
+        cleanText.includes('<scope>') ||
+        cleanText.includes('<plugin>') ||
+        cleanText.includes('<configuration>')
+      );
+      
+      if (isStartOfNewGroup) {
+        // Finish current group if it exists
+        if (currentGroup.length > 0) {
+          groupedLines.push(createGroupedLine(currentGroup, groupOp));
+          currentGroup = [];
+        }
+        // Start new group
+        currentGroup.push(line);
+        groupOp = line.op;
+      } else if (currentGroup.length > 0) {
+        // Continue current group if this line looks like it belongs
+        const looksLikeContinuation = cleanText.includes('<') || cleanText.includes('</') || cleanText === '';
+        if (looksLikeContinuation) {
+          currentGroup.push(line);
+          if (line.op !== 'unchanged' && groupOp === 'unchanged') {
+            groupOp = line.op;
+          }
+        } else {
+          // This line doesn't belong to current group, finish it
+          groupedLines.push(createGroupedLine(currentGroup, groupOp));
+          currentGroup = [];
+          groupedLines.push(line);
+        }
+      } else {
+        // No current group, add line individually
+        groupedLines.push(line);
       }
-      groupedLines.push(line);
     }
   }
   
@@ -926,6 +1042,10 @@ function generateSanitizedHtml(blocks) {
         html += `<h${block.level} class="freedocs-heading">${escapeHtml(block.text)}</h${block.level}>\n`;
         break;
         
+      case 'image':
+        html += generateImageHtml(block);
+        break;
+        
       case 'paragraph':
         html += `<p class="freedocs-paragraph">${escapeHtml(block.text)}</p>\n`;
         break;
@@ -970,6 +1090,68 @@ function generateSanitizedHtml(blocks) {
   });
   
   html += '</div>';
+  return html;
+}
+
+/**
+ * Generates HTML for image blocks with original format preservation
+ */
+function generateImageHtml(block) {
+  const { src, alt, title, width, height, format, isArchiveImage, originalSrc } = block;
+  
+  // Build attributes
+  let attributes = `src="${escapeHtml(src)}"`;
+  
+  if (alt) {
+    attributes += ` alt="${escapeHtml(alt)}"`;
+  }
+  
+  if (title) {
+    attributes += ` title="${escapeHtml(title)}"`;
+  }
+  
+  if (width) {
+    attributes += ` width="${width}"`;
+  }
+  
+  if (height) {
+    attributes += ` height="${height}"`;
+  }
+  
+  // Add data attributes for metadata
+  attributes += ` data-format="${format}"`;
+  attributes += ` data-is-archive-image="${isArchiveImage}"`;
+  attributes += ` data-original-src="${escapeHtml(originalSrc)}"`;
+  attributes += ` data-extracted-at="${block.metadata.extractedAt}"`;
+  
+  // Add CSS classes
+  const classes = ['freedocs-image'];
+  if (isArchiveImage) {
+    classes.push('archive-image');
+  }
+  if (format !== 'unknown') {
+    classes.push(`format-${format}`);
+  }
+  
+  attributes += ` class="${classes.join(' ')}"`;
+  
+  // Generate the image HTML
+  let html = `<div class="freedocs-image-container">\n`;
+  html += `  <img ${attributes} />\n`;
+  
+  // Add metadata display if it's an archive image
+  if (isArchiveImage) {
+    html += `  <div class="freedocs-image-metadata">\n`;
+    html += `    <span class="image-format">Format: ${format.toUpperCase()}</span>\n`;
+    html += `    <span class="image-source">Source: Internet Archive</span>\n`;
+    if (originalSrc !== src) {
+      html += `    <span class="original-url">Original: ${escapeHtml(originalSrc)}</span>\n`;
+    }
+    html += `  </div>\n`;
+  }
+  
+  html += `</div>\n`;
+  
   return html;
 }
 
@@ -1053,6 +1235,9 @@ module.exports = {
   isCodeLikeParagraph,
   detectLanguage,
   generateSanitizedHtml,
+  generateImageHtml,
+  extractImages,
   escapeHtml,
-  unescapeHtml
+  unescapeHtml,
+  groupXmlLines
 };

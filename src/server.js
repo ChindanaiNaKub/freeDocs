@@ -16,7 +16,27 @@ const rateLimiter = new RateLimiterMemory({
 });
 
 // Middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://web.archive.org",
+          "https://*.web.archive.org",
+          "https://*.googleusercontent.com",
+          "https://lh7-rt.googleusercontent.com"
+        ],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        objectSrc: ["'none'"]
+      }
+    }
+  })
+);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));

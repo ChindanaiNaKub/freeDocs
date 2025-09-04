@@ -35,10 +35,10 @@ router.get('/status', (req, res) => {
   });
 });
 
-// GET /api/render?url=<googleDocsUrl>
+// GET /api/render?url=<googleDocsUrl>&extractImages=<boolean>
 router.get('/render', async (req, res) => {
   try {
-    const { url } = req.query;
+    const { url, extractImages } = req.query;
     
     if (!url) {
       return res.status(400).json({
@@ -70,8 +70,11 @@ router.get('/render', async (req, res) => {
       });
     }
 
-    // Parse archived content
-    const { html } = await parseArchivedContent(archiveResult.url);
+    // Parse archived content with image extraction option
+    const parseOptions = {
+      extractImages: extractImages === 'true'
+    };
+    const { html } = await parseArchivedContent(archiveResult.url, parseOptions);
 
     res.json({
       html,
@@ -101,10 +104,10 @@ router.get('/render', async (req, res) => {
   }
 });
 
-// GET /api/parse?url=<googleDocsUrl>&autoDetectCode=<boolean>&showDeletions=<boolean>
+// GET /api/parse?url=<googleDocsUrl>&autoDetectCode=<boolean>&showDeletions=<boolean>&extractImages=<boolean>
 router.get('/parse', async (req, res) => {
   try {
-    const { url, autoDetectCode, showDeletions } = req.query;
+    const { url, autoDetectCode, showDeletions, extractImages } = req.query;
     
     if (!url) {
       return res.status(400).json({
@@ -115,7 +118,8 @@ router.get('/parse', async (req, res) => {
     // Parse boolean parameters
     const parseOptions = {
       autoDetectCode: autoDetectCode === 'true',
-      showDeletions: showDeletions === 'true'
+      showDeletions: showDeletions === 'true',
+      extractImages: extractImages === 'true'
     };
 
     // Validate and normalize URL

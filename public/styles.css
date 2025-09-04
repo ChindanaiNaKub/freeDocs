@@ -395,6 +395,120 @@ body {
   font-style: italic;
 }
 
+/* Images */
+.freedocs-image-container {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.freedocs-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: block;
+  background-color: #f8f9fa;
+  min-height: 50px;
+}
+
+/* Image loading states */
+.freedocs-image[src=""] {
+  background-color: #e9ecef;
+  border: 2px dashed #dee2e6;
+}
+
+.freedocs-image:not([src]) {
+  background-color: #e9ecef;
+  border: 2px dashed #dee2e6;
+}
+
+.freedocs-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.freedocs-image-metadata {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.freedocs-image-metadata span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.image-format::before {
+  content: "📄";
+  margin-right: 0.25rem;
+}
+
+.image-source::before {
+  content: "🏛️";
+  margin-right: 0.25rem;
+}
+
+.original-url::before {
+  content: "🔗";
+  margin-right: 0.25rem;
+}
+
+/* Archive image specific styling */
+.freedocs-image.archive-image {
+  border: 2px solid #3b82f6;
+  position: relative;
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.freedocs-image.archive-image::after {
+  content: "Internet Archive";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Format-specific styling */
+.freedocs-image.format-jpeg {
+  border-color: #10b981;
+}
+
+.freedocs-image.format-png {
+  border-color: #8b5cf6;
+}
+
+.freedocs-image.format-gif {
+  border-color: #f59e0b;
+}
+
+.freedocs-image.format-svg {
+  border-color: #ef4444;
+}
+
+.freedocs-image.format-webp {
+  border-color: #06b6d4;
+}
+
 /* Diff Lines */
 .line-unchanged {
   display: block;
@@ -447,6 +561,16 @@ body {
   
   .freedocs-code {
     font-size: 0.8rem;
+  }
+  
+  .freedocs-image-metadata {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .freedocs-image.archive-image::after {
+    font-size: 0.6rem;
+    padding: 0.2rem 0.4rem;
   }
 }
 

@@ -435,6 +435,160 @@ async function isArchiveAccessible(archiveUrl) {
 }
 
 /**
+ * Normalizes image URLs to ensure they work with Internet Archive
+ * @param {string} imageUrl - The image URL to normalize
+ * @param {string} baseArchiveUrl - The base archive URL for relative paths
+ * @returns {string} - Normalized image URL
+ */
+function normalizeImageUrl(imageUrl, baseArchiveUrl) {
+  if (!imageUrl) return imageUrl;
+  
+  // If it's already an absolute URL, return as-is
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  
+  // If it's a protocol-relative URL, add https
+  if (imageUrl.startsWith('//')) {
+    return 'https:' + imageUrl;
+  }
+  
+  // If it's a relative URL, we need to construct the full archive URL
+  if (imageUrl.startsWith('/')) {
+    // Extract the base archive URL without the specific page path
+    try {
+      const url = new URL(baseArchiveUrl);
+      const archiveBase = `${url.protocol}//${url.hostname}`;
+      return archiveBase + imageUrl;
+    } catch (error) {
+      console.warn('Error parsing base archive URL:', error.message);
+      return imageUrl; // Return original if parsing fails
+    }
+  }
+  
+  // For relative URLs without leading slash, try to construct from base
+  if (!imageUrl.startsWith('/') && baseArchiveUrl) {
+    try {
+      const baseUrl = new URL(baseArchiveUrl);
+      return new URL(imageUrl, baseUrl.origin).href;
+    } catch (error) {
+      console.warn('Error constructing image URL:', error.message);
+      return imageUrl;
+    }
+  }
+  
+  return imageUrl;
+}
+
+/**
+ * Checks if an image URL is from Internet Archive
+ * @param {string} imageUrl - The image URL to check
+ * @returns {boolean} - True if it's an archive image
+ */
+function isArchiveImageUrl(imageUrl) {
+  if (!imageUrl) return false;
+  
+  return imageUrl.includes('web.archive.org') || 
+         imageUrl.includes('im_/') ||
+         imageUrl.includes('im_/https://') ||
+         imageUrl.includes('wayback.archive.org');
+}
+
+/**
+ * Extracts image format from URL or content type
+ * @param {string} imageUrl - The image URL
+ * @param {string} contentType - Optional content type header
+ * @returns {string} - Detected format
+ */
+function detectImageFormat(imageUrl, contentType = '') {
+  const urlLower = imageUrl.toLowerCase();
+  const contentTypeLower = contentType.toLowerCase();
+  
+  // Check content type first (most reliable)
+  if (contentTypeLower.includes('image/jpeg') || contentTypeLower.includes('image/jpg')) {
+    return 'jpeg';
+  }
+  if (contentTypeLower.includes('image/png')) {
+    return 'png';
+  }
+  if (contentTypeLower.includes('image/gif')) {
+    return 'gif';
+  }
+  if (contentTypeLower.includes('image/webp')) {
+    return 'webp';
+  }
+  if (contentTypeLower.includes('image/svg+xml')) {
+    return 'svg';
+  }
+  if (contentTypeLower.includes('image/bmp')) {
+    return 'bmp';
+  }
+  if (contentTypeLower.includes('image/tiff')) {
+    return 'tiff';
+  }
+  
+  // Check URL extension
+  if (urlLower.includes('.jpg') || urlLower.includes('.jpeg')) {
+    return 'jpeg';
+  }
+  if (urlLower.includes('.png')) {
+    return 'png';
+  }
+  if (urlLower.includes('.gif')) {
+    return 'gif';
+  }
+  if (urlLower.includes('.webp')) {
+    return 'webp';
+  }
+  if (urlLower.includes('.svg')) {
+    return 'svg';
+  }
+  if (urlLower.includes('.bmp')) {
+    return 'bmp';
+  }
+  if (urlLower.includes('.tiff') || urlLower.includes('.tif')) {
+    return 'tiff';
+  }
+  
+  // For Internet Archive images, try to make an educated guess based on common patterns
+  if (urlLower.includes('web.archive.org') || urlLower.includes('wayback.archive.org')) {
+    // Check if the original URL (before archive) had an extension
+    // Internet Archive URLs often contain the original URL
+    const originalUrlMatch = urlLower.match(/im_\/https?:\/\/[^\/]+\/([^\/\?]+)/);
+    if (originalUrlMatch) {
+      const originalFilename = originalUrlMatch[1];
+      if (originalFilename.includes('.jpg') || originalFilename.includes('.jpeg')) {
+        return 'jpeg';
+      }
+      if (originalFilename.includes('.png')) {
+        return 'png';
+      }
+      if (originalFilename.includes('.gif')) {
+        return 'gif';
+      }
+      if (originalFilename.includes('.webp')) {
+        return 'webp';
+      }
+      if (originalFilename.includes('.svg')) {
+        return 'svg';
+      }
+      if (originalFilename.includes('.bmp')) {
+        return 'bmp';
+      }
+      if (originalFilename.includes('.tiff') || originalFilename.includes('.tif')) {
+        return 'tiff';
+      }
+    }
+    
+    // Most images on the web are JPEG or PNG, with JPEG being more common
+    // For archive images without extensions, default to JPEG as it's the most common format
+    return 'jpeg';
+  }
+  
+  return 'unknown';
+}
+
+/**
  * Clear expired cache entries
  */
 function clearExpiredCache() {
@@ -463,6 +617,9 @@ module.exports = {
   isArchiveAccessible,
   getCachedContent,
   setCachedContent,
+  normalizeImageUrl,
+  isArchiveImageUrl,
+  detectImageFormat,
   // Legacy compatibility
   submitToArchive: (url) => getArchiveSnapshot(url).then(result => result.url)
 };
