@@ -1,0 +1,427 @@
+/* FreeDocs - Diff-Aware Assignment Viewer Styles */
+
+:root {
+  --primary-color: #2563eb;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --added-color: #dcfce7;
+  --added-border: #16a34a;
+  --removed-color: #fef2f2;
+  --removed-border: #dc2626;
+  --code-bg: #f8fafc;
+  --border-color: #e2e8f0;
+  --text-color: #1e293b;
+  --text-muted: #64748b;
+  --bg-color: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.header h1 {
+  color: var(--primary-color);
+  margin: 0 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.header p {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Input Section */
+.input-section {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.url-input-group {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.url-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.load-btn {
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.load-btn:hover {
+  background: #1d4ed8;
+}
+
+.load-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.options {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.option input[type="checkbox"] {
+  cursor: pointer;
+}
+
+/* Status */
+.status {
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.status.loading {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.status.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.status.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.status.hidden {
+  display: none;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 6px 6px 0 0;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.info a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.info a:hover {
+  text-decoration: underline;
+}
+
+.global-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--text-color);
+}
+
+.btn-secondary:hover {
+  background: #f1f5f9;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Document Content */
+.document-content {
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: white;
+}
+
+.freedocs-content {
+  padding: 2rem;
+  max-width: none;
+}
+
+/* Typography */
+.freedocs-heading {
+  color: var(--text-color);
+  margin: 2rem 0 1rem 0;
+  line-height: 1.3;
+}
+
+.freedocs-heading:first-child {
+  margin-top: 0;
+}
+
+.freedocs-paragraph {
+  margin: 1rem 0;
+  line-height: 1.7;
+}
+
+.freedocs-blockquote {
+  margin: 1.5rem 0;
+  padding: 1rem 1.5rem;
+  border-left: 4px solid var(--primary-color);
+  background: #f8fafc;
+  color: var(--text-muted);
+}
+
+.freedocs-list {
+  margin: 1rem 0;
+  padding-left: 2rem;
+}
+
+.freedocs-list li {
+  margin: 0.5rem 0;
+}
+
+/* Code Blocks */
+.freedocs-code-block {
+  margin: 1.5rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.freedocs-code-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.copy-btn {
+  padding: 0.4rem 0.8rem;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.copy-btn:hover {
+  background: #059669;
+}
+
+.copy-btn:active {
+  background: #047857;
+  transform: scale(0.98);
+}
+
+.toggle-deletions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.freedocs-code {
+  margin: 0;
+  padding: 1rem;
+  background: var(--code-bg);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.freedocs-code code {
+  display: block;
+  white-space: pre;
+}
+
+/* Diff Lines */
+.line-unchanged {
+  display: block;
+}
+
+.line-added {
+  display: block;
+  background-color: var(--added-color);
+  border-left: 3px solid var(--added-border);
+  padding-left: 0.5rem;
+  margin-left: -0.5rem;
+}
+
+.line-removed {
+  display: block;
+  background-color: var(--removed-color);
+  border-left: 3px solid var(--removed-border);
+  padding-left: 0.5rem;
+  margin-left: -0.5rem;
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.line-removed.hidden {
+  display: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+  
+  .url-input-group {
+    flex-direction: column;
+  }
+  
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .global-controls {
+    justify-content: center;
+  }
+  
+  .freedocs-content {
+    padding: 1rem;
+  }
+  
+  .freedocs-code {
+    font-size: 0.8rem;
+  }
+}
+
+/* Footer */
+.footer {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.legal-notice {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.legal-notice p {
+  margin: 0 0 1rem 0;
+}
+
+.legal-notice p:last-child {
+  margin: 0;
+}
+
+/* Animations */
+.status {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.copy-btn.success {
+  background: var(--success-color);
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
