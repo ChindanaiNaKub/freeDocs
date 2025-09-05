@@ -464,39 +464,6 @@ body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.freedocs-image-metadata {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: #f8fafc;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: center;
-}
-
-.freedocs-image-metadata span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.image-format::before {
-  content: "📄";
-  margin-right: 0.25rem;
-}
-
-.image-source::before {
-  content: "🏛️";
-  margin-right: 0.25rem;
-}
-
-.original-url::before {
-  content: "🔗";
-  margin-right: 0.25rem;
-}
 
 /* Archive image specific styling */
 .freedocs-image.archive-image {
@@ -599,10 +566,6 @@ body {
     font-size: 0.8rem;
   }
   
-  .freedocs-image-metadata {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
   
   .freedocs-image.archive-image::after {
     font-size: 0.6rem;
