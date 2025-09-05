@@ -92,12 +92,15 @@ async function parseArchivedContent(archiveUrl, options = {}) {
     // Parse the content into blocks
     const blocks = parseContentBlocks($, { ...parseOptions, archiveUrl });
     
+    // Post-process to merge consecutive code blocks that should be grouped
+    const mergedBlocks = mergeConsecutiveCodeBlocks(blocks);
+    
     // Generate sanitized HTML for rendering
-    const html = generateSanitizedHtml(blocks);
+    const html = generateSanitizedHtml(mergedBlocks);
 
     return {
       html,
-      blocks
+      blocks: mergedBlocks
     };
 
   } catch (error) {
@@ -294,10 +297,26 @@ function parseContentBlocks($, options = {}) {
                   const combinedBlock = parseCodeContent(newContent, 'paragraph-group', options);
                   blocks[blocks.length - 1] = combinedBlock;
                 } else {
-                  // Create new code block
-                  block = parseCodeContent($el.text(), 'paragraph', options);
-                  if (block) {
-                    blocks.push(block);
+                  // Look ahead to see if this should start a new group with following elements
+                  const lookAheadResult = checkForCodeSequence($, allElements, i, options);
+                  if (lookAheadResult.isCodeSequence) {
+                    // Create a group from this element and following code elements
+                    const combinedText = lookAheadResult.elements.map($el => unescapeHtml($el.text())).join('\n');
+                    const codeBlock = parseCodeContent(combinedText, 'paragraph-group', options);
+                    blocks.push(codeBlock);
+                    // Mark all processed elements
+                    for (let j = 0; j < lookAheadResult.elementsProcessed; j++) {
+                      $(allElements[i + j]).addClass('processed');
+                    }
+                    i += lookAheadResult.elementsProcessed;
+                  } else {
+                    // Create new single code block
+                    block = parseCodeContent($el.text(), 'paragraph', options);
+                    if (block) {
+                      blocks.push(block);
+                    }
+                    $el.addClass('processed');
+                    i++;
                   }
                 }
               } else {
@@ -532,6 +551,218 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
 }
 
 /**
+ * Merges consecutive code blocks that should be grouped together
+ * @param {Array} blocks - Array of parsed blocks
+ * @returns {Array} - Array of blocks with consecutive code blocks merged
+ */
+function mergeConsecutiveCodeBlocks(blocks) {
+  const mergedBlocks = [];
+  let i = 0;
+
+  while (i < blocks.length) {
+    const currentBlock = blocks[i];
+    
+    if (currentBlock.type === 'code') {
+      // Look for consecutive code blocks that should be merged
+      const codeBlocksToMerge = [currentBlock];
+      let j = i + 1;
+      
+      while (j < blocks.length) {
+        const nextBlock = blocks[j];
+        
+        // Check if the next block should be merged
+        if (shouldMergeCodeBlocks(currentBlock, nextBlock, blocks, j)) {
+          codeBlocksToMerge.push(nextBlock);
+          j++;
+        } else {
+          // Check for small gaps (like single paragraphs that might be separators)
+          if (j < blocks.length - 1 && 
+              nextBlock.type === 'paragraph' && 
+              nextBlock.content && 
+              nextBlock.content.length < 50 &&
+              blocks[j + 1] && 
+              blocks[j + 1].type === 'code' &&
+              shouldMergeCodeBlocks(currentBlock, blocks[j + 1], blocks, j + 1)) {
+            // Include the separator and the next code block
+            codeBlocksToMerge.push(nextBlock);
+            codeBlocksToMerge.push(blocks[j + 1]);
+            j += 2;
+          } else {
+            break;
+          }
+        }
+      }
+      
+      if (codeBlocksToMerge.length > 1) {
+        // Merge the code blocks
+        const mergedContent = codeBlocksToMerge
+          .map(block => {
+            if (block.type === 'code') {
+              return block.lines.map(line => line.text).join('\n');
+            } else if (block.type === 'paragraph') {
+              return block.content || '';
+            }
+            return '';
+          })
+          .filter(content => content.length > 0)
+          .join('\n');
+        
+        const mergedBlock = parseCodeContent(mergedContent, 'merged-group', {});
+        mergedBlocks.push(mergedBlock);
+        i = j;
+      } else {
+        mergedBlocks.push(currentBlock);
+        i++;
+      }
+    } else {
+      mergedBlocks.push(currentBlock);
+      i++;
+    }
+  }
+  
+  return mergedBlocks;
+}
+
+/**
+ * Determines if two code blocks should be merged
+ * @param {Object} firstBlock - The first code block
+ * @param {Object} secondBlock - The second block to potentially merge
+ * @param {Array} allBlocks - All blocks for context
+ * @param {number} secondIndex - Index of the second block
+ * @returns {boolean} - Whether the blocks should be merged
+ */
+function shouldMergeCodeBlocks(firstBlock, secondBlock, allBlocks, secondIndex) {
+  if (!secondBlock || secondBlock.type !== 'code') {
+    return false;
+  }
+  
+  // Get the content of both blocks
+  const firstContent = firstBlock.lines.map(line => line.text).join('\n');
+  const secondContent = secondBlock.lines.map(line => line.text).join('\n');
+  
+  // Check if both blocks contain XML/Maven-like content
+  const hasXmlPattern = (content) => {
+    return /<[^>]+>/.test(content) || 
+           /\b(dependency|groupId|artifactId|version|scope)\b/i.test(content);
+  };
+  
+  const bothHaveXml = hasXmlPattern(firstContent) && hasXmlPattern(secondContent);
+  
+  // Check if both blocks have diff markers (+ or -)
+  const hasDiffMarkers = (content) => {
+    return /^[\s]*[+\-]/.test(content);
+  };
+  
+  const bothHaveDiffMarkers = hasDiffMarkers(firstContent) && hasDiffMarkers(secondContent);
+  
+  // Check if they're part of the same logical structure
+  const isRelatedXml = (content1, content2) => {
+    // Maven dependency pattern
+    if (content1.includes('dependency') && (content2.includes('groupId') || content2.includes('artifactId') || content2.includes('version'))) {
+      return true;
+    }
+    if (content2.includes('dependency') && (content1.includes('groupId') || content1.includes('artifactId') || content1.includes('version'))) {
+      return true;
+    }
+    
+    // XML opening/closing tag pattern
+    const xmlTagRegex = /<(\w+)>/;
+    const closingTagRegex = /<\/(\w+)>/;
+    
+    const match1 = content1.match(xmlTagRegex);
+    const match2 = content2.match(closingTagRegex);
+    
+    if (match1 && match2 && match1[1] === match2[1]) {
+      return true;
+    }
+    
+    return false;
+  };
+  
+  // Merge if:
+  // 1. Both have XML content
+  // 2. Both have diff markers
+  // 3. They're related XML content
+  // 4. Both are short (likely fragments of the same code block)
+  
+  if (bothHaveXml || bothHaveDiffMarkers || isRelatedXml(firstContent, secondContent)) {
+    return true;
+  }
+  
+  // If both blocks are very short, they're likely fragments
+  if (firstContent.trim().length < 100 && secondContent.trim().length < 100) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Check for a sequence of code-like elements starting from the given index
+ * @param {CheerioAPI} $ - Cheerio instance
+ * @param {Array} allElements - Array of all elements
+ * @param {number} startIndex - Starting index to check
+ * @param {Object} options - Parsing options
+ * @returns {Object} - Result with isCodeSequence flag, elements, and elementsProcessed count
+ */
+function checkForCodeSequence($, allElements, startIndex, options = {}) {
+  const codeElements = [];
+  let elementsProcessed = 0;
+
+  // Look ahead for consecutive code-like elements
+  for (let i = startIndex; i < allElements.length && i < startIndex + 10; i++) { // Limit lookahead
+    const $currentEl = $(allElements[i]);
+    const element = allElements[i];
+
+    if ($currentEl.hasClass('processed') || $currentEl.parents('.processed').length > 0) {
+      break;
+    }
+
+    const tagName = element.tagName.toLowerCase();
+    if (tagName !== 'p' && tagName !== 'div') {
+      break;
+    }
+
+    const currentText = $currentEl.text();
+    const trimmedText = currentText.replace(/&nbsp;/g, ' ').trim();
+    
+    // Check if this element looks like code
+    if (isCodeLikeParagraph($currentEl, currentText) || 
+        (codeElements.length > 0 && canBeInCodeBlockAggressive($currentEl, currentText, true))) {
+      codeElements.push($currentEl);
+      elementsProcessed++;
+    } else {
+      // Check if this is a clear break
+      const isNumberedInstruction = /^\d+\.\d*\.?\s/.test(trimmedText) && !/[<>{}=;]/.test(trimmedText);
+      const isInstructionalText = /^(Add|Create|Update|Now|Next|Wait|Open|If|See|Note|The component|Creating the entity|In this lab|As given|With the given information|Now we will create)\b/i.test(trimmedText) && !/[<>{}=;]/.test(trimmedText);
+      
+      if (isNumberedInstruction || isInstructionalText) {
+        break;
+      }
+      
+      // Allow short lines or empty lines to continue the sequence
+      if (trimmedText.length <= 5) {
+        codeElements.push($currentEl);
+        elementsProcessed++;
+        continue;
+      }
+      
+      break;
+    }
+  }
+
+  // Only consider it a sequence if we have at least 2 elements or 1 element with XML content
+  const isSequence = codeElements.length >= 2 || 
+    (codeElements.length === 1 && /<[^>]+>/.test(codeElements[0].text()));
+
+  return {
+    isCodeSequence: isSequence,
+    elements: codeElements,
+    elementsProcessed: isSequence ? elementsProcessed : 0
+  };
+}
+
+/**
  * Parses a potential code group starting from the given index
  * @param {CheerioAPI} $ - Cheerio instance
  * @param {Array} allElements - Array of all elements
@@ -549,7 +780,7 @@ function parseCodeGroup($, allElements, startIndex, options = {}) {
       return { isCodeGroup: false, elementsProcessed: 0 };
   }
 
-  // If it is, then start grouping.
+  // Much more aggressive grouping: continue collecting until we hit a very clear non-code element
   for (let i = startIndex; i < allElements.length; i++) {
     const $currentEl = $(allElements[i]);
     const element = allElements[i];
@@ -565,13 +796,28 @@ function parseCodeGroup($, allElements, startIndex, options = {}) {
     }
 
     const currentText = $currentEl.text();
+    const trimmedText = currentText.replace(/&nbsp;/g, ' ').trim();
     
-    // After starting, use the more lenient check.
-    if (canBeInCodeBlock($currentEl, currentText)) {
+    // Very aggressive grouping logic - include almost everything that could be related
+    if (canBeInCodeBlockUltraAggressive($currentEl, currentText, codeElements.length > 0)) {
       codeElements.push($currentEl);
       elementsProcessed++;
     } else {
-      // This paragraph breaks the code block.
+      // Only break on very clear instruction patterns
+      const isVeryStrongBreak = /^(\d+\.\s|Note that you|Wait for the IDE|Open the|Run the application|Then add|After you add|Create the controller|Add the given information)\b/i.test(trimmedText);
+      
+      if (isVeryStrongBreak) {
+        break;
+      }
+      
+      // If we have collected elements and this is empty or very short, include it to maintain continuity
+      if (codeElements.length > 0 && (trimmedText.length === 0 || trimmedText.length < 10)) {
+        codeElements.push($currentEl);
+        elementsProcessed++;
+        continue;
+      }
+      
+      // Otherwise break the group
       break;
     }
   }
@@ -840,12 +1086,30 @@ function isCodeLikeParagraph($el, text) {
 
     // Check for indentation (spaces or tabs at the beginning of the original text)
     if (/^(\s{2,}|\t)/.test(text)) return true;
+    
+    // Check for diff markers (+ or - at beginning)
     if (/^\s*[+\-@]/.test(trimmedText)) return true;
-    if (/<(dependency|groupId|artifactId|version|scope)>/.test(trimmedText)) return true;
-    if (/\b(import|package|public|class|static|final|void|long|string|boolean)\b/i.test(trimmedText)) return true;
+    
+    // Check for XML/HTML tags
+    if (/<(dependency|groupId|artifactId|version|scope|[a-zA-Z][a-zA-Z0-9]*)\s*[/>]/.test(trimmedText)) return true;
+    
+    // Check for programming keywords
+    if (/\b(import|package|public|class|static|final|void|long|string|boolean|function|var|let|const)\b/i.test(trimmedText)) return true;
+    
+    // Check for typical code endings
     if (trimmedText.endsWith(';') || trimmedText.endsWith('{') || trimmedText.endsWith('}')) return true;
+    
+    // Check for monospace font family
     if ($el.css('font-family')?.includes('monospace')) return true;
+    
+    // Check for code-like characters
     if (/[<>{}=]/.test(trimmedText)) return true;
+    
+    // More aggressive XML detection for Maven dependencies
+    if (/^[+\-\s]*<\/?[a-zA-Z][a-zA-Z0-9]*>/.test(trimmedText)) return true;
+    
+    // Detect lines that look like they're part of XML structure
+    if (/^[+\-\s]*[<>=]/.test(trimmedText)) return true;
 
     return false;
 }
@@ -876,6 +1140,126 @@ function canBeInCodeBlock($el, text) {
     }
 
     return true;
+}
+
+/**
+ * Ultra-aggressive grouping function for code blocks - includes almost anything that could be code
+ * @param {Object} $el - jQuery element
+ * @param {string} text - Text content
+ * @param {boolean} hasCodeElements - Whether we already have code elements in the group
+ */
+function canBeInCodeBlockUltraAggressive($el, text, hasCodeElements = false) {
+    const trimmedText = text.replace(/&nbsp;/g, ' ').trim();
+    
+    // Empty lines are always OK to include
+    if (trimmedText.length === 0) {
+        return true;
+    }
+    
+    // Only break on very clear instruction patterns
+    const veryStrongBreakPatterns = [
+        /^\d+\.\s/, // Numbered instructions like "1. ", "2. "
+        /^Note that you/, 
+        /^Wait for the IDE/,
+        /^Open the /,
+        /^Run the application/,
+        /^Then add/,
+        /^After you add/,
+        /^Create the controller/,
+        /^Add the given information/,
+        /^Now we will create/,
+        /^In the component/,
+        /^If you do not use/
+    ];
+    
+    const isVeryStrongBreak = veryStrongBreakPatterns.some(pattern => 
+        pattern.test(trimmedText) && !/[<>{}=;]/.test(trimmedText)
+    );
+    
+    if (isVeryStrongBreak) {
+        return false;
+    }
+    
+    // If we already have code elements, be extremely permissive
+    if (hasCodeElements) {
+        // Include almost everything that could be related to code
+        return true;
+    }
+    
+    // For the first element, use the original check but make it more permissive
+    return isCodeLikeParagraph($el, text);
+}
+
+/**
+ * More aggressive grouping function for code blocks
+ * @param {Object} $el - jQuery element
+ * @param {string} text - Text content
+ * @param {boolean} hasCodeElements - Whether we already have code elements in the group
+ */
+function canBeInCodeBlockAggressive($el, text, hasCodeElements = false) {
+    const trimmedText = text.replace(/&nbsp;/g, ' ').trim();
+    
+    // Empty lines are always OK to include
+    if (trimmedText.length === 0) {
+        return true;
+    }
+    
+    // Clear breaks that should end a code block
+    if (/^\d+\.\d*\.?\s/.test(trimmedText) && !/[<>{}=;]/.test(trimmedText)) {
+        return false;
+    }
+    
+    // Strong instructional patterns that break code blocks
+    const strongInstructionalPattern = /^(Now we will create|Next, add|Then, update|After you add|click to update|you will see|Add the component|Create the entity|Update the pom\.xml as given|Note that|Wait for the IDE|Open the|If you|Run the|show the)\b/i;
+    if (strongInstructionalPattern.test(trimmedText)) {
+        return false;
+    }
+    
+    // If we already have code elements, be much more permissive
+    if (hasCodeElements) {
+        // Always allow XML-like content
+        if (/<[^>]+>/.test(trimmedText)) {
+            return true;
+        }
+        
+        // Allow content that looks like code continuation
+        if (/^[\s]*[<>{}()=;,+\-]+/.test(trimmedText)) {
+            return true;
+        }
+        
+        // Allow indented content
+        if (/^[\s]{2,}/.test(text)) {
+            return true;
+        }
+        
+        // Allow lines that end with typical code endings
+        if (/[;{}>\)]$/.test(trimmedText)) {
+            return true;
+        }
+        
+        // Allow lines with typical code patterns
+        if (/\b(dependency|groupId|artifactId|version|scope|import|package|class|function|var|let|const)\b/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Allow lines that start with + or - (diff markers)
+        if (/^[\s]*[+\-]/.test(trimmedText)) {
+            return true;
+        }
+        
+        // Allow very short lines that might be continuation
+        if (trimmedText.length <= 10 && !/^[A-Z]/.test(trimmedText)) {
+            return true;
+        }
+        
+        // If it looks like it could be code (has special characters), include it
+        if (/[<>={}[\];.,()]/.test(trimmedText)) {
+            return true;
+        }
+    }
+    
+    // Use the original check for first element
+    return isCodeLikeParagraph($el, text);
 }
 
 /**
