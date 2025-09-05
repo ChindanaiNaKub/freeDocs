@@ -455,7 +455,23 @@ function normalizeImageUrl(imageUrl, baseArchiveUrl) {
   
   // If it's a relative URL, we need to construct the full archive URL
   if (imageUrl.startsWith('/')) {
-    // Extract the base archive URL without the specific page path
+    // For Internet Archive image URLs, we need to preserve the timestamp
+    if (imageUrl.startsWith('/im_/') && baseArchiveUrl) {
+      try {
+        const url = new URL(baseArchiveUrl);
+        // Extract the timestamp from the base archive URL
+        // Format: https://web.archive.org/web/TIMESTAMP/https://...
+        const timestampMatch = url.pathname.match(/^\/web\/([^\/]+)\//);
+        if (timestampMatch) {
+          const timestamp = timestampMatch[1];
+          return `${url.protocol}//${url.hostname}/web/${timestamp}im_${imageUrl.substring(4)}`;
+        }
+      } catch (error) {
+        console.warn('Error parsing archive URL for image:', error.message);
+      }
+    }
+    
+    // Fallback: Extract the base archive URL without the specific page path
     try {
       const url = new URL(baseArchiveUrl);
       const archiveBase = `${url.protocol}//${url.hostname}`;

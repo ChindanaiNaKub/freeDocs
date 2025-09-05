@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://web.archive.org https://*.web.archive.org https://lh7-rt.googleusercontent.com https://*.googleusercontent.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>Test Image Loading Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-image { margin: 10px 0; border: 1px solid #ccc; padding: 10px; }
+        .success { color: green; }
+        .error { color: red; }
+        img { max-width: 300px; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>Testing Image Loading Fix</h1>
+    
+    <div class="test-image">
+        <h3>Test 1: Correct Internet Archive Image URL Format</h3>
+        <p>This should work with the fixed URL normalization:</p>
+        <img src="https://web.archive.org/web/20240101000000im_/https://lh7-rt.googleusercontent.com/test.jpg" 
+             alt="Test image with correct format" 
+             onload="this.parentElement.querySelector('.status').textContent='✅ Loaded successfully'; this.parentElement.querySelector('.status').className='status success';"
+             onerror="this.parentElement.querySelector('.status').textContent='❌ Failed to load'; this.parentElement.querySelector('.status').className='status error';">
+        <div class="status">Loading...</div>
+    </div>
+    
+    <div class="test-image">
+        <h3>Test 2: Old Incorrect Format (for comparison)</h3>
+        <p>This should fail with the old incorrect format:</p>
+        <img src="https://web.archive.org/im_/https://lh7-rt.googleusercontent.com/test.jpg" 
+             alt="Test image with incorrect format" 
+             onload="this.parentElement.querySelector('.status').textContent='✅ Loaded successfully'; this.parentElement.querySelector('.status').className='status success';"
+             onerror="this.parentElement.querySelector('.status').textContent='❌ Failed to load'; this.parentElement.querySelector('.status').className='status error';">
+        <div class="status">Loading...</div>
+    </div>
+    
+    <div class="test-image">
+        <h3>Test 3: Direct Google Image (should work)</h3>
+        <p>This should work as it's a direct image URL:</p>
+        <img src="https://lh7-rt.googleusercontent.com/test.jpg" 
+             alt="Test direct image" 
+             onload="this.parentElement.querySelector('.status').textContent='✅ Loaded successfully'; this.parentElement.querySelector('.status').className='status success';"
+             onerror="this.parentElement.querySelector('.status').textContent='❌ Failed to load'; this.parentElement.querySelector('.status').className='status error';">
+        <div class="status">Loading...</div>
+    </div>
+    
+    <script>
+        console.log('Testing image loading fix...');
+        
+        // Log all image load/error events
+        document.querySelectorAll('img').forEach((img, index) => {
+            img.addEventListener('load', () => {
+                console.log(`Image ${index + 1} loaded successfully:`, img.src);
+            });
+            
+            img.addEventListener('error', () => {
+                console.log(`Image ${index + 1} failed to load:`, img.src);
+            });
+        });
+    </script>
+</body>
+</html>
