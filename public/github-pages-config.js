@@ -12,11 +12,11 @@ const GITHUB_PAGES_CONFIG = {
     // API endpoint configuration
     // Backend deployed on Render
     apiEndpoints: {
-        // Replace 'your-app-name' with your actual Render app name
-        base: 'https://freedocs-api.onrender.com',
-        archive: 'https://freedocs-api.onrender.com/api/archive',
-        parse: 'https://freedocs-api.onrender.com/api/parse',
-        health: 'https://freedocs-api.onrender.com/api/health'
+        // Updated to use the correct Render app name
+        base: 'https://freedocs.onrender.com',
+        archive: 'https://freedocs.onrender.com/api/archive',
+        parse: 'https://freedocs.onrender.com/api/parse',
+        health: 'https://freedocs.onrender.com/api/health'
     }
 };
 
