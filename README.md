@@ -48,6 +48,20 @@ A simple web app that helps you copy content from Google Docs that may have copy
 - Copy functionality can be inconsistent
 - No proper error messages yet
 
+## Future Features
+
+### Download Options
+- **Markdown Export**: Download parsed content as .md files with proper formatting
+- **PDF Export**: Generate and download PDF versions of the documents
+- **Multiple Format Support**: Support for various export formats (HTML, TXT, etc.)
+
+### Enhanced Functionality
+- Better code block detection and syntax highlighting
+- Improved formatting preservation from original Google Docs
+- Batch processing for multiple documents
+- Document comparison and diff visualization
+- Custom styling options for exports
+
 ## Testing
 
 ```bash
