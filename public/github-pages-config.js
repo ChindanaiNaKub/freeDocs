@@ -10,20 +10,13 @@ const GITHUB_PAGES_CONFIG = {
     baseUrl: '/freeDocs',
     
     // API endpoint configuration
-    // For GitHub Pages, you'll need to either:
-    // 1. Deploy API separately (e.g., Vercel, Netlify Functions, Railway)
-    // 2. Use a CORS proxy service
-    // 3. Implement client-side only functionality
-    
-    // Example API endpoints (replace with your deployed API)
+    // Backend deployed on Render
     apiEndpoints: {
-        // If you deploy the API elsewhere:
-        // archive: 'https://your-api-domain.com/api/archive',
-        // parse: 'https://your-api-domain.com/api/parse'
-        
-        // For now, using CORS proxy (not recommended for production)
-        archive: 'https://cors-anywhere.herokuapp.com/https://web.archive.org',
-        parse: '/api/parse' // This won't work on GitHub Pages without backend
+        // Replace 'your-app-name' with your actual Render app name
+        base: 'https://freedocs-api.onrender.com',
+        archive: 'https://freedocs-api.onrender.com/api/archive',
+        parse: 'https://freedocs-api.onrender.com/api/parse',
+        health: 'https://freedocs-api.onrender.com/api/health'
     }
 };
 
