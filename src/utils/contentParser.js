@@ -5,6 +5,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const { getArchivedContent, getCachedContent, normalizeImageUrl, isArchiveImageUrl, detectImageFormat } = require('./archiveClient');
+const { parseFormattedContent, generateFormattedHtml, escapeHtmlPreserveFormatting } = require('./formatParser');
 
 /**
  * Fetches and parses archived content
@@ -598,32 +599,30 @@ function parseCodeGroup($, allElements, startIndex, options = {}) {
  * Parses a heading element
  */
 function parseHeading($, $el, tagName) {
+  const formatted = parseFormattedContent($, $el);
   return {
     type: 'heading',
     level: parseInt(tagName.substring(1)),
-    text: $el.text().trim(),
-    html: $el.html()
+    text: formatted.text,
+    html: formatted.html,
+    hasFormatting: formatted.hasFormatting
   };
 }
 
 /**
- * Parses a paragraph element with diff-aware detection
+ * Parses a paragraph element with diff-aware detection and formatting preservation
  */
 function parseParagraph($, $el) {
-  let text = $el.text();
-  
-  // Unescape HTML entities for accurate text representation
-  if (text.includes('&lt;') || text.includes('&gt;') || text.includes('&amp;')) {
-    text = unescapeHtml(text);
-  }
+  const formatted = parseFormattedContent($, $el);
   
   // This function no longer detects code. It just creates paragraph blocks.
   // Code detection is handled by parseCodeGroup in parseContentBlocks.
   return {
     type: 'paragraph',
-    text: text.trim(),
-    html: $el.html(),
-    lines: text.trim() ? [{ text: text.trim(), op: 'unchanged' }] : []
+    text: formatted.text,
+    html: formatted.html,
+    hasFormatting: formatted.hasFormatting,
+    lines: formatted.text ? [{ text: formatted.text, op: 'unchanged' }] : []
   };
 }
 
@@ -663,12 +662,8 @@ function parseList($, $el, options = {}) {
   
   $el.find('li').each((index, li) => {
     const $li = $(li);
-    let text = $li.text().trim();
-    
-    // Check if the text contains HTML entities that need to be unescaped
-    if (text.includes('&lt;') || text.includes('&gt;') || text.includes('&amp;')) {
-      text = unescapeHtml(text);
-    }
+    const formatted = parseFormattedContent($, $li);
+    let text = formatted.text;
     
     const isCodeLike = options.autoDetectCode !== false && isCodeLikeParagraph($li, text);
     
@@ -685,6 +680,10 @@ function parseList($, $el, options = {}) {
           customNumber = numberMatch[1];
           // Remove the number prefix from the text since we'll handle it in rendering
           text = text.replace(/^\d+(?:\.\d+)*\.\s*/, '');
+          // Also update the formatted HTML if it has formatting
+          if (formatted.hasFormatting) {
+            formatted.html = formatted.html.replace(/^\d+(?:\.\d+)*\.\s*/, '');
+          }
         } else if (googleDocsListMatch) {
           // Handle Google Docs CSS-based hierarchical numbering
           const [, listName, level] = googleDocsListMatch;
@@ -703,7 +702,9 @@ function parseList($, $el, options = {}) {
       const item = {
         type: 'list-item',
         text: text,
-        lines: [{ text: text, op: 'unchanged' }]
+        lines: [{ text: text, op: 'unchanged' }],
+        hasFormatting: formatted.hasFormatting,
+        html: formatted.html
       };
       if (customNumber !== null) {
         item.customNumber = customNumber;
@@ -1102,7 +1103,11 @@ function generateSanitizedHtml(blocks) {
   blocks.forEach(block => {
     switch (block.type) {
       case 'heading':
-        html += `<h${block.level} class="freedocs-heading">${escapeHtml(block.text)}</h${block.level}>\n`;
+        if (block.hasFormatting) {
+          html += `<h${block.level} class="freedocs-heading formatted">${escapeHtmlPreserveFormatting(block.html)}</h${block.level}>\n`;
+        } else {
+          html += `<h${block.level} class="freedocs-heading">${escapeHtml(block.text)}</h${block.level}>\n`;
+        }
         break;
         
       case 'image':
@@ -1110,7 +1115,11 @@ function generateSanitizedHtml(blocks) {
         break;
         
       case 'paragraph':
-        html += `<p class="freedocs-paragraph">${escapeHtml(block.text)}</p>\n`;
+        if (block.hasFormatting) {
+          html += `<p class="freedocs-paragraph formatted">${escapeHtmlPreserveFormatting(block.html)}</p>\n`;
+        } else {
+          html += `<p class="freedocs-paragraph">${escapeHtml(block.text)}</p>\n`;
+        }
         break;
         
       case 'code':
@@ -1122,7 +1131,11 @@ function generateSanitizedHtml(blocks) {
         break;
         
       case 'blockquote':
-        html += `<blockquote class="freedocs-blockquote">${escapeHtml(block.text)}</blockquote>\n`;
+        if (block.hasFormatting) {
+          html += `<blockquote class="freedocs-blockquote formatted">${escapeHtmlPreserveFormatting(block.html)}</blockquote>\n`;
+        } else {
+          html += `<blockquote class="freedocs-blockquote">${escapeHtml(block.text)}</blockquote>\n`;
+        }
         break;
         
       case 'unordered-list':
@@ -1137,13 +1150,21 @@ function generateSanitizedHtml(blocks) {
           if (item.type === 'code') {
             html += `<li${valueAttr}>${generateCodeBlockHtml(item)}</li>\n`;
           } else {
+            // Handle formatted list items
+            let itemContent;
+            if (item.hasFormatting) {
+              itemContent = escapeHtmlPreserveFormatting(item.html || item.text);
+            } else {
+              itemContent = escapeHtml(item.text);
+            }
+            
             // For ALL custom numbering, use CSS to display it consistently
             if (item.customNumber) {
               html += `<li data-custom-number="${item.customNumber}">`;
               html += `<span class="custom-number">${item.customNumber}</span>`;
-              html += `${escapeHtml(item.text)}</li>\n`;
+              html += `${itemContent}</li>\n`;
             } else {
-              html += `<li${valueAttr}>${escapeHtml(item.text)}</li>\n`;
+              html += `<li${valueAttr}>${itemContent}</li>\n`;
             }
           }
         });

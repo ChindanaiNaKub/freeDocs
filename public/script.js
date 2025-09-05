@@ -219,12 +219,18 @@ class FreeDocs {
   renderBlock(block, index) {
     switch (block.type) {
       case 'heading':
+        if (block.hasFormatting && block.html) {
+          return `<h${block.level} class="freedocs-heading formatted">${this.preserveFormatting(block.html)}</h${block.level}>\n`;
+        }
         return `<h${block.level} class="freedocs-heading">${this.escapeHtml(block.text)}</h${block.level}>\n`;
       
       case 'image':
         return this.renderImageBlock(block, index);
       
       case 'paragraph':
+        if (block.hasFormatting && block.html) {
+          return `<p class="freedocs-paragraph formatted">${this.preserveFormatting(block.html)}</p>\n`;
+        }
         return `<p class="freedocs-paragraph">${this.escapeHtml(block.text)}</p>\n`;
       
       case 'code':
@@ -232,6 +238,9 @@ class FreeDocs {
         return this.renderCodeBlock(block, index);
       
       case 'blockquote':
+        if (block.hasFormatting && block.html) {
+          return `<blockquote class="freedocs-blockquote formatted">${this.preserveFormatting(block.html)}</blockquote>\n`;
+        }
         return `<blockquote class="freedocs-blockquote">${this.escapeHtml(block.text)}</blockquote>\n`;
       
       case 'unordered-list':
@@ -403,11 +412,20 @@ class FreeDocs {
         html += `<li>${this.renderCodeBlock(item, Math.random().toString(36).substr(2, 9))}</li>\n`;
       } else {
         const hasCustom = item.customNumber !== null && item.customNumber !== undefined;
+        
+        // Handle formatting in list items
+        let itemContent;
+        if (item.hasFormatting && item.html) {
+          itemContent = this.preserveFormatting(item.html);
+        } else {
+          itemContent = this.escapeHtml(item.text);
+        }
+        
         if (hasCustom) {
           const custom = this.escapeHtml(String(item.customNumber));
-          html += `<li data-custom-number="${custom}"><span class="custom-number">${custom}</span>${this.escapeHtml(item.text)}</li>\n`;
+          html += `<li data-custom-number="${custom}"><span class="custom-number">${custom}</span>${itemContent}</li>\n`;
         } else {
-          html += `<li>${this.escapeHtml(item.text)}</li>\n`;
+          html += `<li>${itemContent}</li>\n`;
         }
       }
     });
@@ -593,6 +611,48 @@ class FreeDocs {
     } else {
       loadBtn.textContent = 'Load Document';
     }
+  }
+
+  preserveFormatting(html) {
+    // This function preserves safe HTML formatting tags while escaping others
+    if (typeof html !== 'string') return this.escapeHtml(html || '');
+    
+    // List of allowed formatting tags
+    const allowedTags = ['strong', 'em', 'u', 'a'];
+    
+    // Temporarily replace allowed tags with placeholders
+    const placeholders = {};
+    let counter = 0;
+    
+    allowedTags.forEach(tag => {
+      // Handle opening tags with attributes (like <a href="...">)
+      const openRegex = new RegExp('<' + tag + '(\\s[^>]*)?>', 'gi');
+      html = html.replace(openRegex, (match) => {
+        const placeholder = '__PLACEHOLDER_' + counter + '__';
+        placeholders[placeholder] = match;
+        counter++;
+        return placeholder;
+      });
+      
+      // Handle closing tags
+      const closeRegex = new RegExp('</' + tag + '>', 'gi');
+      html = html.replace(closeRegex, (match) => {
+        const placeholder = '__PLACEHOLDER_' + counter + '__';
+        placeholders[placeholder] = match;
+        counter++;
+        return placeholder;
+      });
+    });
+    
+    // Escape all remaining HTML
+    html = this.escapeHtml(html);
+    
+    // Restore allowed tags
+    Object.keys(placeholders).forEach(placeholder => {
+      html = html.replace(placeholder, placeholders[placeholder]);
+    });
+    
+    return html;
   }
 
   escapeHtml(text) {

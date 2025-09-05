@@ -1,17 +1,12 @@
-// Test the HTML escaping issue
-function escapeHtml(text) {
-  const div = { innerHTML: '' };
-  div.textContent = text;
-  return div.innerHTML || text.replace(/[&<>"']/g, m => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  })[m]);
-}
+const { escapeHtmlPreserveFormatting } = require('./src/utils/formatParser');
 
-const testText = '<scope>provided</scope>';
-console.log('Original text:', testText);
-console.log('Escaped once:', escapeHtml(testText));
-console.log('Escaped twice:', escapeHtml(escapeHtml(testText)));
+// Test the escape function
+const testHtml = '<u>Objective:</u> In this session, You will start using Spring Boot development';
+
+console.log('Input:', testHtml);
+console.log('Output:', escapeHtmlPreserveFormatting(testHtml));
+
+// Test if it's working correctly
+const result = escapeHtmlPreserveFormatting(testHtml);
+console.log('Contains <u>:', result.includes('<u>'));
+console.log('Contains </u>:', result.includes('</u>'));

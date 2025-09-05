@@ -48,8 +48,28 @@ body {
 .header h1 {
   color: var(--primary-color);
   margin: 0 0 0.5rem 0;
-  font-size: 2.5rem;
-  font-weight: 700;
+}
+
+.header-links {
+  margin-top: 1rem;
+}
+
+.demo-link {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.demo-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  text-decoration: none;
 }
 
 .header p {
@@ -446,6 +466,64 @@ body {
   margin: 0 auto;
   background-color: #f8f9fa;
   min-height: 50px;
+}
+
+/* Text Formatting - Bold, Italic, Underline, Links */
+.freedocs-content strong {
+  font-weight: bold;
+}
+
+.freedocs-content em {
+  font-style: italic;
+}
+
+.freedocs-content u {
+  text-decoration: underline;
+}
+
+.freedocs-content a {
+  color: var(--primary-color);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+.freedocs-content a:hover {
+  border-bottom-color: var(--primary-color);
+  text-decoration: none;
+}
+
+.freedocs-content a:visited {
+  color: #8b5cf6;
+}
+
+/* Formatted content indicator */
+.freedocs-content .formatted {
+  position: relative;
+}
+
+/* Preserve Google Docs formatting */
+.freedocs-content .formatted strong,
+.freedocs-content .formatted b {
+  font-weight: 600 !important;
+}
+
+.freedocs-content .formatted em,
+.freedocs-content .formatted i {
+  font-style: italic !important;
+}
+
+.freedocs-content .formatted u {
+  text-decoration: underline !important;
+}
+
+/* List formatting */
+.freedocs-list .formatted strong,
+.freedocs-list .formatted em,
+.freedocs-list .formatted u,
+.freedocs-list .formatted a {
+  /* Formatting preserved from original document */
+  display: inline;
 }
 
 /* Image loading states */
