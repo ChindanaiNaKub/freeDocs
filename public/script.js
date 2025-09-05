@@ -3,32 +3,9 @@
  * Handles UI interactions, API calls, and copy functionality
  */
 
-// API Configuration - detects environment and uses appropriate config
+// API Configuration - uses relative URLs since frontend and backend are on the same domain
 const getApiBaseUrl = () => {
-  // Check if we're running locally (localhost or 127.0.0.1)
-  const isLocal = window.location.hostname === 'localhost' || 
-                  window.location.hostname === '127.0.0.1' ||
-                  window.location.hostname === '';
-  
-  // Debug logging
-  console.log('Environment detection:', {
-    hostname: window.location.hostname,
-    isLocal: isLocal,
-    hasLocalConfig: typeof window.LOCAL_DEV_CONFIG !== 'undefined',
-    hasGitHubPagesConfig: typeof window.GITHUB_PAGES_CONFIG !== 'undefined'
-  });
-  
-  if (isLocal && typeof window.LOCAL_DEV_CONFIG !== 'undefined') {
-    const baseUrl = window.LOCAL_DEV_CONFIG.apiEndpoints.base;
-    console.log('Using local config:', baseUrl);
-    return baseUrl;
-  } else if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
-    const baseUrl = window.GITHUB_PAGES_CONFIG.apiEndpoints.base;
-    console.log('Using GitHub Pages config:', baseUrl);
-    return baseUrl;
-  }
-  console.log('Using fallback: relative URLs');
-  return ''; // Fallback to relative URLs
+  return ''; // Use relative URLs - works for both local development and production
 };
 
 class FreeDocs {
