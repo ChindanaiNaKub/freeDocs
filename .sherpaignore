@@ -1,0 +1,14 @@
+node_modules/
+.git/
+*.log
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+coverage/
+.nyc_output/
+test_*.js
+debug_*.js
+*.test.js
+.DS_Store

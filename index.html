@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://web.archive.org https://*.web.archive.org https://lh7-rt.googleusercontent.com https://*.googleusercontent.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>FreeDocs - Diff-Aware Assignment Viewer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>FreeDocs</h1>
+            <p>Diff-Aware Google Docs Assignment Viewer</p>
+        </header>
+
+        <div class="input-section">
+            <div class="url-input-group">
+                <input 
+                    type="url" 
+                    id="docsUrl" 
+                    placeholder="Paste Google Docs URL here..." 
+                    class="url-input"
+                >
+                <button id="loadBtn" class="load-btn">Load Document</button>
+            </div>
+            
+            <div class="options">
+                <label class="option">
+                    <input type="checkbox" id="treatAsCode" checked>
+                    Auto-detect code blocks
+                </label>
+                <label class="option">
+                    <input type="checkbox" id="showDeletions" checked>
+                    Show deleted lines
+                </label>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="content-area" id="contentArea" style="display: none;">
+            <div class="toolbar">
+                <div class="info">
+                    <span id="archiveLink" style="display: none;">
+                        <strong>Archive:</strong> <a href="#" target="_blank" id="archiveUrl">View Original</a>
+                    </span>
+                </div>
+                
+                <div class="global-controls">
+                    <button id="copyAllClean" class="btn btn-secondary">Copy All (Clean)</button>
+                    <button id="copyAllAdditions" class="btn btn-secondary">Copy All (Additions Only)</button>
+                </div>
+            </div>
+
+            <div class="document-content" id="documentContent">
+                <!-- Parsed content will be inserted here -->
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="legal-notice">
+                <p><strong>Legal Notice:</strong> This tool processes publicly accessible Google Docs content via Internet Archive. 
+                Please respect copyright and terms of use. Only use with documents you have permission to access.</p>
+                
+                <p><strong>Privacy:</strong> URLs and content are processed server-side for parsing. 
+                We do not store or log document content permanently.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
