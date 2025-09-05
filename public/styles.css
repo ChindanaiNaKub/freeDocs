@@ -146,6 +146,27 @@ body {
   cursor: pointer;
 }
 
+/* Warning Section */
+.warning-section {
+  margin-top: 1rem;
+}
+
+.warning-message {
+  background: #fef3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.warning-message strong {
+  font-weight: 600;
+}
+
 /* Status */
 .status {
   padding: 1rem;

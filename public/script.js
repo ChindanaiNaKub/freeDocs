@@ -45,6 +45,9 @@ class FreeDocs {
 
     // Show deletions toggle
     document.getElementById('showDeletions').addEventListener('change', (e) => {
+      // Show/hide warning based on checkbox state
+      this.updateWarningVisibility();
+      
       // First update the display immediately
       this.toggleDeletions(e.target.checked);
       
@@ -56,6 +59,9 @@ class FreeDocs {
 
     // Treat as code toggle
     document.getElementById('treatAsCode').addEventListener('change', (e) => {
+      // Show/hide warning based on checkbox state
+      this.updateWarningVisibility();
+      
       // Reload the document with new settings if we have a current URL
       if (this.currentArchiveUrl) {
         this.loadDocument();
@@ -69,6 +75,19 @@ class FreeDocs {
     
     if (!this.hasClipboardAPI) {
       console.warn('Clipboard API not available, using fallback');
+    }
+  }
+
+  updateWarningVisibility() {
+    const treatAsCode = document.getElementById('treatAsCode').checked;
+    const showDeletions = document.getElementById('showDeletions').checked;
+    const warningSection = document.getElementById('warningSection');
+    
+    // Show warning if either checkbox is checked
+    if (treatAsCode || showDeletions) {
+      warningSection.style.display = 'block';
+    } else {
+      warningSection.style.display = 'none';
     }
   }
 
