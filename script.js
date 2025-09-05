@@ -3,6 +3,14 @@
  * Handles UI interactions, API calls, and copy functionality
  */
 
+// API Configuration - uses GitHub Pages config if available, otherwise defaults to relative URLs
+const getApiBaseUrl = () => {
+  if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
+    return window.GITHUB_PAGES_CONFIG.apiEndpoints.base;
+  }
+  return ''; // Relative URLs for local development
+};
+
 class FreeDocs {
   constructor() {
     this.currentBlocks = [];
@@ -98,7 +106,8 @@ class FreeDocs {
       });
       
       // First try to parse the content
-      const response = await fetch(`/api/parse?${params.toString()}`);
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/parse?${params.toString()}`);
       
       if (!response.ok) {
         const errorData = await response.json();
