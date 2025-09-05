@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeDocs Debug Test</title>
+</head>
+<body>
+    <h1>FreeDocs Debug Test</h1>
+    <div id="debug-output"></div>
+    
+    <script>
+        const debugOutput = document.getElementById('debug-output');
+        
+        function log(message) {
+            console.log(message);
+            debugOutput.innerHTML += '<p>' + JSON.stringify(message) + '</p>';
+        }
+        
+        log('Starting debug test...');
+        log('Location: ' + window.location.href);
+        log('Hostname: ' + window.location.hostname);
+        
+        // Test if configs are loaded
+        log('LOCAL_DEV_CONFIG available: ' + (typeof window.LOCAL_DEV_CONFIG !== 'undefined'));
+        log('GITHUB_PAGES_CONFIG available: ' + (typeof window.GITHUB_PAGES_CONFIG !== 'undefined'));
+        
+        // Test API endpoint
+        const testUrl = 'https://freedocs.onrender.com/api/health';
+        log('Testing API endpoint: ' + testUrl);
+        
+        fetch(testUrl)
+            .then(response => {
+                log('Response status: ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                log('API Response: ' + JSON.stringify(data));
+            })
+            .catch(error => {
+                log('API Error: ' + error.message);
+            });
+    </script>
+    
+    <!-- Load configs -->
+    <script src="local-dev-config.js"></script>
+    <script src="github-pages-config.js"></script>
+    <script>
+        // After configs loaded
+        log('After loading configs:');
+        log('LOCAL_DEV_CONFIG: ' + (typeof window.LOCAL_DEV_CONFIG !== 'undefined' ? 'loaded' : 'not loaded'));
+        log('GITHUB_PAGES_CONFIG: ' + (typeof window.GITHUB_PAGES_CONFIG !== 'undefined' ? 'loaded' : 'not loaded'));
+        
+        if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
+            log('GitHub Pages config API base: ' + window.GITHUB_PAGES_CONFIG.apiEndpoints.base);
+        }
+    </script>
+</body>
+</html>
