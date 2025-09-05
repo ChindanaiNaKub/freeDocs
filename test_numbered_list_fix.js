@@ -14,6 +14,7 @@ const testHtml = `
 <p>1.1. Open your Intellij Idea (if you use other IDE, go to 1.8)</p>
 <p>1.2. Note: If you have registered for the GitHub Student Pack, then you can register for the student license at https://www.jetbrains.com/community/education/ to use the Ultimate version of the software.</p>
 <p>1.3. Create your new spring project by selecting a new project and selecting the data as shown in the picture</p>
+<p>1.4. In the component, we now select nothing in this stage</p>
 <p>Note that you may have to install Java version 17 to get all the features of the source code.</p>
 </div>
 </body>

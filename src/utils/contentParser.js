@@ -197,6 +197,9 @@ function extractSafeContent(content) {
 function parseContentBlocks($, options = {}) {
   const blocks = [];
   
+  // Global list counters to track hierarchical numbering across the document
+  const globalListCounters = {};
+  
   // Find the main content area (Google Docs mobilebasic structure)
   const contentSelectors = [
     '.doc-content',
@@ -334,7 +337,7 @@ function parseContentBlocks($, options = {}) {
         
       case 'ul':
       case 'ol':
-        block = parseList($, $el, options);
+        block = parseList($, $el, { ...options, globalListCounters });
         if (block) {
           blocks.push(block);
         }
@@ -486,45 +489,9 @@ function parseNumberedListGroup($, allElements, startIndex, options = {}) {
     
     const [, number, content] = match;
     
-    // Determine the appropriate numbering
+    // Preserve the original numbering from the document
+    // For Google Docs and similar sources, the numbering is already correct
     let displayNumber = number;
-    
-    // Check if this is a hierarchical number (e.g., "1.1", "2.3")
-    if (number.includes('.')) {
-      // Already hierarchical, use as-is
-      displayNumber = number;
-      hasSeenSubItems = true;
-    } else {
-      // Simple integer number
-      const numValue = parseInt(number, 10);
-      
-      if (lastMainNumber === null) {
-        // First item
-        lastMainNumber = numValue;
-        subItemCounter = 0;
-        displayNumber = number;
-      } else if (numValue === lastMainNumber) {
-        // Same main number as previous - make it a sub-item
-        subItemCounter++;
-        displayNumber = `${lastMainNumber}.${subItemCounter}`;
-        hasSeenSubItems = true;
-      } else if (hasSeenSubItems && numValue > lastMainNumber) {
-        // We've seen sub-items and this is a new main number
-        // Always treat as sub-item when we're in a hierarchical context
-        subItemCounter++;
-        displayNumber = `${lastMainNumber}.${subItemCounter}`;
-        hasSeenSubItems = true;
-      } else if (lastMainNumber !== null) {
-        // For any subsequent number after we've started a list, 
-        // treat it as a sub-item unless it's clearly a new major section
-        subItemCounter++;
-        displayNumber = `${lastMainNumber}.${subItemCounter}`;
-        hasSeenSubItems = true;
-      } else {
-        // This shouldn't happen, but just in case
-        displayNumber = number;
-      }
-    }
     
     // Create the list item
     const isCodeLike = options.autoDetectCode !== false && isCodeLikeParagraph($el, content);
@@ -675,17 +642,24 @@ function parseCodeBlock($, $el, options = {}) {
 }
 
 /**
- * Parses a list element
+ * Parses a list element with Google Docs CSS-based hierarchical numbering support
  */
 function parseList($, $el, options = {}) {
   const items = [];
   const isOrderedList = $el[0].tagName.toLowerCase() === 'ol';
   let startValue = 1;
   
+  // Get the global list counters from options
+  const globalListCounters = options.globalListCounters || {};
+  
   // Check if the ordered list has a custom start value
   if (isOrderedList && $el.attr('start')) {
     startValue = parseInt($el.attr('start'), 10) || 1;
   }
+  
+  // Detect Google Docs CSS-based numbering patterns
+  const listClass = $el.attr('class') || '';
+  const googleDocsListMatch = listClass.match(/lst-kix_(\w+)-(\d+)/);
   
   $el.find('li').each((index, li) => {
     const $li = $(li);
@@ -711,6 +685,10 @@ function parseList($, $el, options = {}) {
           customNumber = numberMatch[1];
           // Remove the number prefix from the text since we'll handle it in rendering
           text = text.replace(/^\d+(?:\.\d+)*\.\s*/, '');
+        } else if (googleDocsListMatch) {
+          // Handle Google Docs CSS-based hierarchical numbering
+          const [, listName, level] = googleDocsListMatch;
+          customNumber = calculateGoogleDocsNumber($, listName, level, index, startValue, globalListCounters);
         }
       }
     }
@@ -739,6 +717,77 @@ function parseList($, $el, options = {}) {
     items: items,
     startValue: startValue
   };
+}
+
+/**
+ * Calculates the proper hierarchical number for Google Docs CSS-based lists
+ * This function reconstructs the hierarchical numbering that would be generated
+ * by Google Docs CSS counters like lst-kix_list_1-0, lst-kix_list_1-1, etc.
+ */
+function calculateGoogleDocsNumber($, listName, level, itemIndex, startValue, listCounters = {}) {
+  const currentLevel = parseInt(level);
+  const listKey = `${listName}-${currentLevel}`;
+  
+  // For level 0 lists (main level), use simple numbering
+  if (currentLevel === 0) {
+    const number = startValue + itemIndex;
+    // Store the level 0 counter for this list to use as parent for sub-levels
+    if (!listCounters[listName]) {
+      listCounters[listName] = {};
+    }
+    listCounters[listName][0] = number;
+    return number;
+  }
+  
+  // For hierarchical lists (level 1+), we need to determine the parent context
+  // From Google Docs CSS: .lst-kix_list_1-1 > li:before{content:"" counter(lst-ctn-kix_list_1-0,decimal) "." counter(lst-ctn-kix_list_1-1,decimal) ". "}
+  // This means level 1 items display as: level0_counter.level1_counter
+  
+  if (currentLevel === 1) {
+    // Get the current level 0 counter for this list
+    let parentCounter = 1; // default fallback
+    if (listCounters[listName] && listCounters[listName][0]) {
+      parentCounter = listCounters[listName][0];
+    } else {
+      // Try to find the most recent level 0 item from the same list in the DOM
+      const level0Items = $(`.lst-kix_${listName}-0`).find('li');
+      if (level0Items.length > 0) {
+        // Get the last level 0 item's number
+        const lastItem = level0Items.last();
+        const text = lastItem.text().trim();
+        const numberMatch = text.match(/^(\d+)/);
+        if (numberMatch) {
+          parentCounter = parseInt(numberMatch[1]);
+          // Store it for future reference
+          if (!listCounters[listName]) {
+            listCounters[listName] = {};
+          }
+          listCounters[listName][0] = parentCounter;
+        }
+      }
+    }
+    
+    const subNumber = startValue + itemIndex;
+    return `${parentCounter}.${subNumber}`;
+  }
+  
+  // For deeper nesting (level 2+), continue the pattern
+  let parentCounter = 1;
+  if (listCounters[listName] && listCounters[listName][0]) {
+    parentCounter = listCounters[listName][0];
+  }
+  
+  const levelNumbers = [parentCounter];
+  
+  // Add intermediate levels (default to 1)
+  for (let i = 1; i < currentLevel; i++) {
+    levelNumbers.push(1);
+  }
+  
+  // Add the current level number
+  levelNumbers.push(startValue + itemIndex);
+  
+  return levelNumbers.join('.');
 }
 
 /**
@@ -1254,5 +1303,7 @@ module.exports = {
   extractImages,
   escapeHtml,
   unescapeHtml,
-  groupXmlLines
+  groupXmlLines,
+  parseList,
+  calculateGoogleDocsNumber
 };
