@@ -26,6 +26,8 @@ jobs:
         run: |
           # Copy all files from public directory to root
           cp -r public/* .
+          # Remove local development configuration for production deployment
+          rm -f local-dev-config.js
           # Ensure we have the updated configuration
           cat github-pages-config.js
           ls -la
@@ -35,4 +37,4 @@ jobs:
         with:
           github_token: ${{ secrets.TOKEN }}
           publish_dir: .
-          exclude_assets: '.github,src,tests,node_modules'
+          exclude_assets: '.github,src,tests,node_modules,local-dev-config.js'
