@@ -10,11 +10,24 @@ const getApiBaseUrl = () => {
                   window.location.hostname === '127.0.0.1' ||
                   window.location.hostname === '';
   
+  // Debug logging
+  console.log('Environment detection:', {
+    hostname: window.location.hostname,
+    isLocal: isLocal,
+    hasLocalConfig: typeof window.LOCAL_DEV_CONFIG !== 'undefined',
+    hasGitHubPagesConfig: typeof window.GITHUB_PAGES_CONFIG !== 'undefined'
+  });
+  
   if (isLocal && typeof window.LOCAL_DEV_CONFIG !== 'undefined') {
-    return window.LOCAL_DEV_CONFIG.apiEndpoints.base;
+    const baseUrl = window.LOCAL_DEV_CONFIG.apiEndpoints.base;
+    console.log('Using local config:', baseUrl);
+    return baseUrl;
   } else if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
-    return window.GITHUB_PAGES_CONFIG.apiEndpoints.base;
+    const baseUrl = window.GITHUB_PAGES_CONFIG.apiEndpoints.base;
+    console.log('Using GitHub Pages config:', baseUrl);
+    return baseUrl;
   }
+  console.log('Using fallback: relative URLs');
   return ''; // Fallback to relative URLs
 };
 
