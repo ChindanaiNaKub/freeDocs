@@ -217,12 +217,6 @@ function parseContentBlocks($, options = {}) {
     $content = $('body');
   }
 
-  // Extract images first if enabled
-  if (options.extractImages !== false) {
-    const imageBlocks = extractImages($, $content, { ...options, archiveUrl: options.archiveUrl });
-    blocks.push(...imageBlocks);
-  }
-
   // Get all elements in document order
   const allElements = $content.find('*').toArray();
   let i = 0;
@@ -242,7 +236,13 @@ function parseContentBlocks($, options = {}) {
     
     switch (tagName) {
       case 'img':
-        // Images are already processed by extractImages function
+        // Process images in their original document position
+        if (options.extractImages !== false) {
+          block = parseImage($, $el, { ...options, archiveUrl: options.archiveUrl });
+          if (block) {
+            blocks.push(block);
+          }
+        }
         $el.addClass('processed-image');
         i++;
         break;
@@ -361,6 +361,51 @@ function parseContentBlocks($, options = {}) {
 }
 
 /**
+ * Parses a single image element in its document position
+ * @param {CheerioAPI} $ - Cheerio instance
+ * @param {Cheerio} $img - Image element
+ * @param {Object} options - Parsing options
+ * @param {string} options.archiveUrl - The archive URL for URL normalization
+ * @returns {Object|null} - Image block or null if invalid
+ */
+function parseImage($, $img, options = {}) {
+  const src = $img.attr('src');
+  const alt = $img.attr('alt') || '';
+  const title = $img.attr('title') || '';
+  const width = $img.attr('width');
+  const height = $img.attr('height');
+  
+  if (!src) {
+    return null; // Skip images without src
+  }
+  
+  // Normalize the image URL using the archive client utilities
+  const imageUrl = normalizeImageUrl(src, options.archiveUrl);
+  
+  // Check if this is an Internet Archive image URL
+  const isArchiveImage = isArchiveImageUrl(imageUrl);
+  
+  // Extract image format using the archive client utility
+  const format = detectImageFormat(imageUrl);
+  
+  return {
+    type: 'image',
+    src: imageUrl,
+    alt: alt,
+    title: title,
+    width: width ? parseInt(width, 10) : null,
+    height: height ? parseInt(height, 10) : null,
+    format: format,
+    isArchiveImage: isArchiveImage,
+    originalSrc: src,
+    metadata: {
+      extractedAt: new Date().toISOString(),
+      preservedFormat: true
+    }
+  };
+}
+
+/**
  * Extracts images from content and preserves their original formats
  * @param {CheerioAPI} $ - Cheerio instance
  * @param {Cheerio} $content - Content container
@@ -374,42 +419,11 @@ function extractImages($, $content, options = {}) {
   // Find all image elements
   $content.find('img').each((index, img) => {
     const $img = $(img);
-    const src = $img.attr('src');
-    const alt = $img.attr('alt') || '';
-    const title = $img.attr('title') || '';
-    const width = $img.attr('width');
-    const height = $img.attr('height');
+    const imageBlock = parseImage($, $img, options);
     
-    if (!src) {
-      return; // Skip images without src
+    if (imageBlock) {
+      imageBlocks.push(imageBlock);
     }
-    
-    // Normalize the image URL using the archive client utilities
-    const imageUrl = normalizeImageUrl(src, options.archiveUrl);
-    
-    // Check if this is an Internet Archive image URL
-    const isArchiveImage = isArchiveImageUrl(imageUrl);
-    
-    // Extract image format using the archive client utility
-    const format = detectImageFormat(imageUrl);
-    
-    const imageBlock = {
-      type: 'image',
-      src: imageUrl,
-      alt: alt,
-      title: title,
-      width: width ? parseInt(width, 10) : null,
-      height: height ? parseInt(height, 10) : null,
-      format: format,
-      isArchiveImage: isArchiveImage,
-      originalSrc: src,
-      metadata: {
-        extractedAt: new Date().toISOString(),
-        preservedFormat: true
-      }
-    };
-    
-    imageBlocks.push(imageBlock);
     
     // Mark the image element as processed to avoid duplicate processing
     $img.addClass('processed-image');
@@ -1236,6 +1250,7 @@ module.exports = {
   detectLanguage,
   generateSanitizedHtml,
   generateImageHtml,
+  parseImage,
   extractImages,
   escapeHtml,
   unescapeHtml,
