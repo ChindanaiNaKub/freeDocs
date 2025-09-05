@@ -3,12 +3,19 @@
  * Handles UI interactions, API calls, and copy functionality
  */
 
-// API Configuration - uses GitHub Pages config if available, otherwise defaults to relative URLs
+// API Configuration - detects environment and uses appropriate config
 const getApiBaseUrl = () => {
-  if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
+  // Check if we're running locally (localhost or 127.0.0.1)
+  const isLocal = window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1' ||
+                  window.location.hostname === '';
+  
+  if (isLocal && typeof window.LOCAL_DEV_CONFIG !== 'undefined') {
+    return window.LOCAL_DEV_CONFIG.apiEndpoints.base;
+  } else if (typeof window.GITHUB_PAGES_CONFIG !== 'undefined') {
     return window.GITHUB_PAGES_CONFIG.apiEndpoints.base;
   }
-  return ''; // Relative URLs for local development
+  return ''; // Fallback to relative URLs
 };
 
 class FreeDocs {
