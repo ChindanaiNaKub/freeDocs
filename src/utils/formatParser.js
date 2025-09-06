@@ -274,6 +274,9 @@ function escapeHtml(text) {
   })[m]);
 }
 
+// Adaptive universal parser export (AST) for higher-level ingestion
+const { parseUniversal } = require('./adapters/registry');
+
 module.exports = {
   parseFormattedContent,
   containsFormatting,
@@ -283,5 +286,6 @@ module.exports = {
   cleanUrl,
   isBoldClass,
   isItalicClass,
-  isUnderlineClass
+  isUnderlineClass,
+  parseUniversal // new export
 };
