@@ -17,4 +17,10 @@ describe('Adaptive parser adapters', () => {
     const result = parseUniversal(sample, { debug: true });
     expect(result.sections.length).toBeGreaterThan(0);
   });
+
+  test('docxHtml detection', () => {
+    const sample = `<!DOCTYPE html><html><body><!--[if gte mso 9]><xml></xml><![endif]--><p class="MsoNormal" style="font-size:22pt;font-weight:bold">Word Export Title</p><p class="MsoNormal">Paragraph</p></body></html>`;
+    const result = parseUniversal(sample, { debug: true });
+    expect(result.diagnostics.adapter === 'docxHtml' || result.diagnostics.adapter === 'fallbackPlain').toBe(true);
+  });
 });

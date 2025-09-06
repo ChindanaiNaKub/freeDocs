@@ -11,12 +11,18 @@ A simple web app that helps you copy content from Google Docs that may have copy
 
 ## Current Status
 
-⚠️ **Work in Progress** - This project is still in development and has several known issues:
+⚠️ **Work in Progress** – now includes an adaptive parser layer.
 
-- Code block parsing is unreliable
-- Diff detection doesn't work properly in all cases
-- UI needs improvement
-- Error handling is incomplete
+### Recent Improvements
+- Adaptive multi-adapter parsing (`googleBasic`, `googleCopyPaste`, `docxHtml`, fallback) for more resilient Google Docs ingestion.
+- New endpoint: `GET /api/universal?url=...&debug=true` returns a normalized AST with optional diagnostics.
+- Server start guard for cleaner tests.
+
+### Still Rough Edges
+- Code block grouping occasionally over-merges.
+- Diff highlighting: deletion filtering not configurable on universal endpoint yet.
+- Some DOCX exports (tables, images) minimally normalized.
+- Open handle warnings in Jest due to long-lived timers (non-fatal; pending cleanup).
 
 ## Quick Start
 
@@ -61,11 +67,25 @@ A simple web app that helps you copy content from Google Docs that may have copy
 - Batch processing for multiple documents
 - Document comparison and diff visualization
 - Custom styling options for exports
+- Universal AST to Markdown / PDF exporters
+- Adapter-specific diagnostics dashboard (to see which heuristics fired)
 
 ## Testing
 
 ```bash
 npm test
+```
+
+Run only universal parser tests:
+
+```bash
+npm test -- universal.test.js
+```
+
+Add `--detectOpenHandles` while debugging leaks:
+
+```bash
+npm test -- --detectOpenHandles
 ```
 
 ## Tech Stack
