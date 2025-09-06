@@ -2,6 +2,7 @@ const express = require('express');
 const { validateGoogleDocsUrl, extractDocId } = require('../utils/urlValidator');
 const { getArchiveSnapshot } = require('../utils/archiveClient');
 const { parseArchivedContent } = require('../utils/contentParser');
+const { parseUniversal } = require('../utils/formatParser');
 
 const router = express.Router();
 
@@ -209,6 +210,50 @@ router.get('/parse', async (req, res) => {
     res.status(500).json({
       error: 'Internal server error'
     });
+  }
+});
+
+// GET /api/universal?url=<googleDocsUrl>&debug=<boolean>
+// Uses the adaptive adapter-based parser to produce a normalized AST
+router.get('/universal', async (req, res) => {
+  try {
+    const { url, debug } = req.query;
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+    if (!validateGoogleDocsUrl(url)) {
+      return res.status(422).json({ error: 'Invalid Google Docs URL' });
+    }
+    const docId = extractDocId(url);
+    if (!docId) {
+      return res.status(422).json({ error: 'Could not extract document ID from URL' });
+    }
+    const mobileBasicUrl = `https://docs.google.com/document/d/${docId}/mobilebasic`;
+    const archiveResult = await getArchiveSnapshot(mobileBasicUrl);
+    if (!archiveResult || !archiveResult.url) {
+      return res.status(502).json({ error: 'Failed to create or retrieve archive snapshot' });
+    }
+    // Fetch raw archived HTML (cached path already handled by archive client)
+    const { getArchivedContent, getCachedContent } = require('../utils/archiveClient');
+    let raw = getCachedContent(archiveResult.url);
+    if (!raw) raw = await getArchivedContent(archiveResult.url);
+    if (!raw || typeof raw !== 'string') {
+      return res.status(502).json({ error: 'Failed to fetch archived HTML content' });
+    }
+    const ast = parseUniversal(raw, { debug: debug === 'true' });
+    res.json({
+      archiveUrl: archiveResult.url,
+      mobileBasicUrl,
+      ast,
+      meta: {
+        service: archiveResult.service,
+        cached: archiveResult.cached,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error in /api/universal:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
